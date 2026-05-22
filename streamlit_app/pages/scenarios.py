@@ -91,6 +91,7 @@ def _render_generator():
                     signals=signals,
                     graph=graph,
                     count=count,
+                    requirement=requirement,
                 )
                 # Time horizon override
                 for s in scenarios:
