@@ -6,8 +6,20 @@ Sinyal akışı + risk skoru + zayıf sinyal radarı.
 import streamlit as st
 import json
 from pathlib import Path
+from datetime import datetime, timezone
 from signals.aggregator import SignalAggregator
 from signals.weak_signal_detector import WeakSignalDetector
+
+
+def _format_date(iso_str: str) -> str:
+    """ISO tarih stringini Türkiye saatine (UTC+3) çevir."""
+    try:
+        from datetime import timedelta
+        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        dt_tr = dt + timedelta(hours=3)  # UTC → UTC+3 (Türkiye)
+        return dt_tr.strftime("%d.%m.%Y %H:%M")
+    except Exception:
+        return iso_str[:16] if iso_str else "—"
 
 
 def render():
@@ -21,11 +33,14 @@ def render():
         signals = json.loads(signals_path.read_text())
         high = [s for s in signals if s.get("composite_score", 0) > 0.7]
         medium = [s for s in signals if 0.4 < s.get("composite_score", 0) <= 0.7]
+
         col1.metric("Toplam Sinyal", len(signals))
-        col2.metric("Yüksek Öncelik", len(high), delta=None)
+        col2.metric("Yüksek Öncelik", len(high))
         col3.metric("Orta Öncelik", len(medium))
-        col4.metric("Son Güncelleme",
-                    signals[0].get("scored_at", "—")[:16] if signals else "—")
+        col4.metric(
+            "Son Güncelleme",
+            _format_date(signals[0].get("scored_at", "")) if signals else "—"
+        )
 
         st.divider()
 
@@ -76,12 +91,13 @@ def _render_signal_table(signals: list):
     rows = []
     for s in signals[:30]:
         rows.append({
-            "Başlık": s.get("title", "")[:60],
+            "Başlık": s.get("title", "")[:70],
             "Kaynak": s.get("source", ""),
+            "Değer": s.get("value", 0),
             "Skor": f"{s.get('composite_score', 0):.3f}",
             "Güvenilirlik": f"{s.get('source_reliability', 0):.2f}",
-            "Kalite": f"{s.get('quality_score', 1):.2f}",
+            "Tarih": _format_date(s.get("collected_at", "")),
         })
     if rows:
-        df = pd.DataFrame(rows)
+        df = __import__("pandas").DataFrame(rows)
         st.dataframe(df, use_container_width=True, hide_index=True)
