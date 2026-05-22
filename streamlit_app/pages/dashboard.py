@@ -1,7 +1,3 @@
-"""
-streamlit_app/pages/dashboard.py
-"""
-
 import streamlit as st
 import json
 from pathlib import Path
@@ -24,57 +20,79 @@ def _load_signals():
     return json.loads(signals_path.read_text())
 
 def render():
-    st.title("📡 Dashboard")
-    st.caption("Canlı sinyal akışı ve risk görünümü")
-
+    # 1. ÜST BAŞLIK VE YENİLEME BUTONU
+    col_title, col_btn = st.columns([4, 1])
+    with col_title:
+        st.title("📡 Yönetim Paneli")
+        st.markdown("Canlı sinyal akışı, risk öngörüleri ve piyasa radarı.")
+    
     signals = _load_signals()
 
+    # 2. BOŞ DURUM (EMPTY STATE) TASARIMI
     if not signals:
-        st.info("Henüz sinyal toplanmadı.")
-        if st.button("🔄 Sinyalleri Topla", type="primary"):
+        st.info("Sistemde henüz analiz edilmiş bir sinyal bulunmuyor.", icon="ℹ️")
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_empty_1, col_empty_2 = st.columns([1, 2])
+        
+        with col_empty_1:
+            if st.button("📡 Sinyalleri Topla ve Analiz Et", type="primary", use_container_width=True):
+                from scheduler.runner import _collect_signals
+                with st.spinner("Dış kaynaklardan veriler çekiliyor ve analiz ediliyor..."):
+                    _collect_signals()
+                _load_signals.clear()
+                st.rerun()
+        return
+
+    # Yenileme butonu (Dolu ekranda sağ üstte)
+    with col_btn:
+        st.markdown("<br>", unsafe_allow_html=True) # Hizalama için
+        if st.button("🔄 Verileri Güncelle", type="primary", use_container_width=True):
             from scheduler.runner import _collect_signals
-            with st.spinner("Toplanıyor..."):
+            with st.spinner("Güncel veriler taranıyor..."):
                 _collect_signals()
             _load_signals.clear()
             st.rerun()
-        return
 
     fx_signals = [s for s in signals if s.get("type") == "fx"]
     idx_signals = [s for s in signals if s.get("type") == "index"]
     news_signals = [s for s in signals if s.get("category") == "political"]
 
+    # 3. KPI KARTLARI (METRİKLER)
     col1, col2, col3 = st.columns(3)
-    col1.metric("Döviz", len(fx_signals))
-    col2.metric("Haber", len(news_signals))
-    col3.metric("Güncelleme",
-                _format_date(signals[0].get("scored_at", "")) if signals else "—")
+    with col1:
+        with st.container(border=True):
+            st.metric("Döviz / Endeks Sinyali", len(fx_signals) + len(idx_signals))
+    with col2:
+        with st.container(border=True):
+            st.metric("Siyasi / Ekonomik Haber", len(news_signals))
+    with col3:
+        with st.container(border=True):
+            st.metric("Son Analiz Tarihi", _format_date(signals[0].get("scored_at", "")) if signals else "—")
 
-    st.divider()
-    st.subheader("🔍 Zayıf Sinyal Radarı")
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # 4. ZAYIF SİNYAL RADARI (YAPAY ZEKA ÇIKTILARI)
+    st.subheader("🔍 Zayıf Sinyal Radarı", anchor=False)
     _render_weak_signals(fx_signals + idx_signals)
 
     st.divider()
+
+    # 5. PİYASA VERİLERİ (KART GÖRÜNÜMÜ)
     if fx_signals or idx_signals:
-        st.subheader("📈 Piyasalar")
+        st.subheader("📈 Piyasalar", anchor=False)
         _render_market_cards(idx_signals + fx_signals)
 
+    # 6. HABER AKIŞI
     if news_signals:
         st.divider()
-        st.subheader("📰 Haberler")
+        st.subheader("📰 Son Gelişmeler ve Haberler", anchor=False)
         _render_news(news_signals)
 
-    # Manuel yenile butonu — alta sabit
-    st.divider()
-    if st.button("🔄 Sinyalleri Yenile", type="secondary"):
-        from scheduler.runner import _collect_signals
-        with st.spinner("Güncelleniyor..."):
-            _collect_signals()
-        _load_signals.clear()
-        st.rerun()
 
 def _render_weak_signals(signals):
     detector = WeakSignalDetector()
     weak = []
+    
     for s in signals:
         metric = s.get("metric", "")
         value = s.get("value", 0)
@@ -82,16 +100,20 @@ def _render_weak_signals(signals):
             result = detector.detect(metric, value)
             if result.get("is_weak_signal"):
                 weak.append({**s, "weak_signal": result})
+                
     if not weak:
-        st.success("✅ Zayıf sinyal tespit edilmedi.")
+        st.success("✅ Radarda kritik veya zayıf bir anomali tespit edilmedi.", icon="✅")
         return
+        
     for w in weak[:5]:
         score = w["weak_signal"]["weak_signal_score"]
         narrative = w["weak_signal"]["narrative"]
-        icon = "🔴" if score > 0.8 else "🟡"
-        with st.container(border=True):
-            st.markdown(f"{icon} **{w.get('title', '?')}**")
-            st.caption(narrative)
+        
+        # Skorlara göre görsel uyarı seviyeleri
+        if score > 0.8:
+            st.error(f"**🔴 {w.get('title', '?')}** (Skor: {score})\n\n{narrative}")
+        else:
+            st.warning(f"**🟡 {w.get('title', '?')}** (Skor: {score})\n\n{narrative}")
 
 def _render_market_cards(signals):
     cols = st.columns(min(len(signals), 4))
@@ -108,10 +130,12 @@ def _render_market_cards(signals):
         delta_str = f"{change_pct:+.2f}%" if change_pct else None
 
         with col:
-            st.metric(label=title, value=val_str, delta=delta_str)
-            if prev_close:
-                st.caption(f"Önceki kapanış: {prev_str}")
-            st.caption(_format_date(s.get("collected_at", "")))
+            # Piyasaları kartlar içinde gösteriyoruz
+            with st.container(border=True):
+                st.metric(label=title, value=val_str, delta=delta_str)
+                if prev_close:
+                    st.caption(f"Önceki: {prev_str}")
+                st.caption(f"Veri: {_format_date(s.get('collected_at', ''))}")
 
 def _render_news(signals):
     label_colors = {"güncel": "🔵", "ekonomi-siyaset": "🟠", "iç siyaset": "🟣"}
@@ -120,18 +144,22 @@ def _render_news(signals):
         key=lambda x: x.get("published_at", x.get("collected_at", "")),
         reverse=True
     )
+    
+    # Haberleri daha şık bir yapıda alt alta sıralıyoruz
     for s in sorted_signals[:20]:
         title = s.get("title", "")
         url = s.get("url", "")
         label = s.get("label", "")
         date = _format_date(s.get("published_at", s.get("collected_at", "")))
         icon = label_colors.get(label, "⚪")
-        col1, col2 = st.columns([5, 1])
-        with col1:
-            if url:
-                st.markdown(f"{icon} [{title}]({url})")
-            else:
-                st.write(f"{icon} {title}")
-        with col2:
-            st.caption(date)
-
+        
+        with st.container():
+            col1, col2 = st.columns([5, 1])
+            with col1:
+                if url:
+                    st.markdown(f"{icon} **[{title}]({url})**")
+                else:
+                    st.markdown(f"{icon} **{title}**")
+            with col2:
+                st.caption(f"🕒 {date}")
+            st.markdown("---") # Haberler arasına ince çizgi
