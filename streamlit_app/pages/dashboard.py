@@ -1,142 +1,84 @@
-"""
-streamlit_app/pages/dashboard.py
-"""
-
 import streamlit as st
-import json
-from pathlib import Path
-from datetime import datetime, timedelta, timezone
-from signals.weak_signal_detector import WeakSignalDetector
-
-
-def _format_date(iso_str: str) -> str:
-    try:
-        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
-        dt_tr = dt + timedelta(hours=3)
-        return dt_tr.strftime("%d.%m.%Y %H:%M")
-    except Exception:
-        return iso_str[:16] if iso_str else "—"
-
-
-@st.cache_data(ttl=None, show_spinner=False)
-def _load_signals():
-    signals_path = Path("uploads/runs/latest_signals.json")
-    if not signals_path.exists():
-        return []
-    return json.loads(signals_path.read_text())
-
+import pandas as pd
 
 def render():
-    st.title("📡 Dashboard")
-    st.caption("Canlı sinyal akışı ve risk görünümü")
+    st.title("📡 Yönetim Paneli")
+    st.markdown("Gerçek zamanlı risk öngörüleri ve tesis güvenlik durumu.")
+    
+    # Sistemin dolu/boş durumunu simüle etmek için Session State kullanımı
+    if "demo_aktif" not in st.session_state:
+        st.session_state.demo_aktif = False
 
-    signals = _load_signals()
-
-    if not signals:
-        st.info("Henüz sinyal toplanmadı.")
-        if st.button("🔄 Sinyalleri Topla", type="primary"):
-            from scheduler.runner import _collect_signals
-            with st.spinner("Toplanıyor..."):
-                _collect_signals()
-            _load_signals.clear()
-            st.rerun()
-        return
-
-    fx_signals = [s for s in signals if s.get("type") == "fx"]
-    idx_signals = [s for s in signals if s.get("type") == "index"]
-    news_signals = [s for s in signals if s.get("category") == "political"]
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Döviz", len(fx_signals))
-    col2.metric("Haber", len(news_signals))
-    col3.metric("Güncelleme",
-                _format_date(signals[0].get("scored_at", "")) if signals else "—")
-
-    st.divider()
-    st.subheader("🔍 Zayıf Sinyal Radarı")
-    _render_weak_signals(fx_signals + idx_signals)
-
-    st.divider()
-    if fx_signals or idx_signals:
-        st.subheader("📈 Piyasalar")
-        _render_market_cards(idx_signals + fx_signals)
-
-    if news_signals:
-        st.divider()
-        st.subheader("📰 Haberler")
-        _render_news(news_signals)
-
-    # Manuel yenile butonu — alta sabit
-    st.divider()
-    if st.button("🔄 Sinyalleri Yenile", type="secondary"):
-        from scheduler.runner import _collect_signals
-        with st.spinner("Güncelleniyor..."):
-            _collect_signals()
-        _load_signals.clear()
-        st.rerun()
-
-
-def _render_weak_signals(signals):
-    detector = WeakSignalDetector()
-    weak = []
-    for s in signals:
-        metric = s.get("metric", "")
-        value = s.get("value", 0)
-        if metric and value:
-            result = detector.detect(metric, value)
-            if result.get("is_weak_signal"):
-                weak.append({**s, "weak_signal": result})
-    if not weak:
-        st.success("✅ Zayıf sinyal tespit edilmedi.")
-        return
-    for w in weak[:5]:
-        score = w["weak_signal"]["weak_signal_score"]
-        narrative = w["weak_signal"]["narrative"]
-        icon = "🔴" if score > 0.8 else "🟡"
-        with st.container(border=True):
-            st.markdown(f"{icon} **{w.get('title', '?')}**")
-            st.caption(narrative)
-
-
-def _render_market_cards(signals):
-    cols = st.columns(min(len(signals), 4))
-    for i, s in enumerate(signals):
-        col = cols[i % len(cols)]
-        title = s.get("title", "")
-        value = s.get("value", 0)
-        change_pct = s.get("change_pct", 0)
-        prev_close = s.get("prev_close", 0)
-        sig_type = s.get("type", "")
-
-        val_str = f"{value:,.0f}" if sig_type == "index" else f"{value:.4f}"
-        prev_str = f"{prev_close:,.0f}" if sig_type == "index" else f"{prev_close:.4f}"
-        delta_str = f"{change_pct:+.2f}%" if change_pct else None
-
-        with col:
-            st.metric(label=title, value=val_str, delta=delta_str)
-            if prev_close:
-                st.caption(f"Önceki kapanış: {prev_str}")
-            st.caption(_format_date(s.get("collected_at", "")))
-
-
-def _render_news(signals):
-    label_colors = {"güncel": "🔵", "ekonomi-siyaset": "🟠", "iç siyaset": "🟣"}
-    sorted_signals = sorted(
-        signals,
-        key=lambda x: x.get("published_at", x.get("collected_at", "")),
-        reverse=True
-    )
-    for s in sorted_signals[:20]:
-        title = s.get("title", "")
-        url = s.get("url", "")
-        label = s.get("label", "")
-        date = _format_date(s.get("published_at", s.get("collected_at", "")))
-        icon = label_colors.get(label, "⚪")
-        col1, col2 = st.columns([5, 1])
+    # ---------------------------------------------------------
+    # DURUM 1: SİSTEMDE VERİ YOKSA (EMPTY STATE)
+    # ---------------------------------------------------------
+    if not st.session_state.demo_aktif:
+        st.info("Sistemde henüz çalıştırılmış bir risk analizi veya aktif senaryo bulunmuyor.", icon="ℹ️")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        
         with col1:
-            if url:
-                st.markdown(f"{icon} [{title}]({url})")
-            else:
-                st.write(f"{icon} {title}")
+            st.markdown("""
+            ### 🚀 Başlamak İçin Adımlar:
+            1. Sol menüden **🏢 Org Setup** kısmına giderek tesis ve departmanları tanımlayın.
+            2. **⚡ Senaryolar** sekmesinden kaza verilerini (örn: REBA skorları, psikososyal anket verileri) yükleyin.
+            3. Sentinel AI analizini başlatın.
+            """)
+            
         with col2:
-            st.caption(date)
+            st.markdown("""
+            ### 💡 Test Etmek İster misiniz?
+            Yapay zeka modelini bağlamadan önce, arayüzün kaza kök neden analizlerini 
+            ve metrikleri nasıl görselleştireceğini görmek için demo verisini yükleyebilirsiniz.
+            """)
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Örnek Panel Görünümünü Yükle", type="primary", use_container_width=True):
+                st.session_state.demo_aktif = True
+                st.rerun()
+
+    # ---------------------------------------------------------
+    # DURUM 2: SİSTEMDE VERİ VARSA (DASHBOARD GÖRÜNÜMÜ)
+    # ---------------------------------------------------------
+    else:
+        # Üst Metrik Kartları
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric(label="İncelenen Kayıt", value="503", delta="Psikososyal Veri Seti", delta_color="off")
+        col2.metric(label="Aktif Risk Faktörü", value="3", delta="2 Kritik Seviye", delta_color="inverse")
+        col3.metric(label="Model Doğruluğu", value="%94.2", delta="XGBoost Aktif")
+        col4.metric(label="Sistem Durumu", value="İzleniyor", delta="Sorun Yok", delta_color="normal")
+        
+        st.divider()
+
+        # Alt Sekmeler
+        tab1, tab2 = st.tabs(["📊 Risk Dağılımı", "⚠️ Aktif AI Uyarıları"])
+        
+        with tab1:
+            col_chart, col_data = st.columns([2, 1])
+            with col_chart:
+                st.markdown("**Departman Bazlı Risk Skorları (0-100)**")
+                # Basit ve ekstra kütüphane gerektirmeyen Streamlit grafiği
+                chart_data = pd.DataFrame({
+                    "Risk Skoru": [82, 45, 68, 25]
+                }, index=["Hücre Üretim Hattı", "İhracat / Lojistik", "Depo Operasyonları", "Ofis"])
+                st.bar_chart(chart_data, color="#ff4b4b")
+                
+            with col_data:
+                st.markdown("**Son Değerlendirmeler**")
+                # Pandas tablosunun arayüze entegresi
+                df_son = pd.DataFrame({
+                    "Tarih": ["22 May", "21 May", "19 May"],
+                    "Konu": ["Ergonomi", "Senkronizasyon", "Gümrük"],
+                    "Skor": [82, 45, 25]
+                })
+                st.dataframe(df_son, use_container_width=True, hide_index=True)
+
+        with tab2:
+            st.error("**Kritik Uyarı:** Lityum batarya (GTİP 8507.60.00.00.21) sevkiyat hazırlık alanında tespit edilen psikososyal stres ve yorgunluk belirtileri, operasyonel hata riskini %14 artırıyor.")
+            st.warning("**Dikkat:** Üretim hattındaki 4. istasyonda REBA analiz skorlarında sapma gözlemlendi. Kök neden tespiti için eklem açısı verilerinin sisteme yüklenmesi bekleniyor.")
+            st.info("**Bilgi:** DİİB kapsamındaki ürünlerin giriş işlemleri tamamlandı, üretim-sevkiyat senkronizasyonunda veri anormalliği tespit edilmedi.")
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("Görünümü Sıfırla (Boş Ekrana Dön)"):
+            st.session_state.demo_aktif = False
+            st.rerun()
