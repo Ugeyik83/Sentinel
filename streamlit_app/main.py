@@ -46,7 +46,7 @@ with st.sidebar:
         """
         <div style='text-align: center; padding-bottom: 10px;'>
             <h1 style='color: #1E3A8A; margin-bottom: 0; font-size: 28px;'>🛡️ SENTINEL</h1>
-            <p style='color: #64748B; font-size: 12px; font-weight: 600; letter-spacing: 1px;'>ENTERPRISE RESILIENCE</p>
+            <p style='color: #64748B; font-size: 10px; font-weight: 600; letter-spacing: 1px;'>ENTERPRISE RESILIENCE PLATFORM</p>
         </div>
         """, 
         unsafe_allow_html=True
