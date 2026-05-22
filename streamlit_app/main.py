@@ -16,17 +16,21 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# 2. Özel CSS Enjeksiyonu (Üst boşlukları daraltma ve font ayarları)
+# 2. Özel CSS Enjeksiyonu (Üst boşlukları daraltma ve kurumsal his)
 st.markdown("""
     <style>
-    /* Ana ekranın üst ve alt boşluklarını azaltır, daha ferah yapar */
+    /* Ana ekranın üst ve alt boşluklarını azaltır */
     .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
     }
-    /* Sidebar arka planını hafif grileştirir (Kurumsal his) */
+    /* Sidebar arka planını hafif grileştirir */
     [data-testid="stSidebar"] {
         background-color: #f8f9fa;
+    }
+    /* Radio butonlarındaki boşlukları düzenler */
+    .stRadio > div {
+        gap: 15px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -47,39 +51,39 @@ with st.sidebar:
         """, 
         unsafe_allow_html=True
     )
-
-# 4. Sayfaları ve Kategorileri Tanımlama (Streamlit 1.36+ Native Navigation)
-# Sayfaları kategorize ederek daha profesyonel bir menü elde ediyoruz.
-pages = {
-    "YÖNETİM PANELİ": [
-        st.Page(dashboard.render, title="Dashboard", icon="📡"),
-    ],
-    "OPERASYON & ANALİZ": [
-        st.Page(org_setup.render, title="Org Setup", icon="🏢"),
-        st.Page(scenarios.render, title="Senaryolar", icon="⚡"),
-    ],
-    "SİSTEM ALTYAPISI": [
-        st.Page(memory.render, title="Hafıza", icon="🧠"),
-        st.Page(settings.render, title="Ayarlar", icon="⚙️"),
-    ]
-}
-
-pg = st.navigation(pages)
-
-# 5. Sidebar: Alt Kısım (Bilgi ve Güvenlik Uyarıları)
-with st.sidebar:
-    st.markdown('<div style="margin-top: 50px;"></div>', unsafe_allow_html=True) # Araya boşluk
-    st.divider()
+    st.markdown("---")
+    
+    # 4. Yönlendirme Menüsü (Orijinal, sağlam yapı)
+    st.markdown("<p style='color: #64748B; font-size: 11px; font-weight: bold;'>ANA MENÜ</p>", unsafe_allow_html=True)
+    page = st.radio("", options=[
+        "📡 Dashboard",
+        "🏢 Org Setup",
+        "⚡ Senaryolar",
+        "🧠 Hafıza",
+        "⚙️ Ayarlar",
+    ], label_visibility="collapsed")
+    
+    st.markdown("---")
+    
+    # 5. Sidebar: Alt Kısım (Model ve Veri Bilgisi)
     model_name = os.environ.get('LLM_MODEL_NAME', 'gpt-4o')
     st.markdown(
         f"""
         <div style='font-size: 13px; color: #64748B;'>
             <div style='margin-bottom: 8px;'>⚙️ <b>Model:</b> <code style='color:#0f172a; background:#e2e8f0; padding:2px 4px; border-radius:4px;'>{model_name}</code></div>
-            <div>🔒 <b>Veri Politikası:</b> Lokal çalışır, harici ağa veri çıkışı kapalıdır.</div>
+            <div>🔒 <b>Veri Politikası:</b> Lokal çalışır, harici veri çıkışı kapalıdır.</div>
         </div>
         """, 
         unsafe_allow_html=True
     )
 
-# 6. Seçilen Sayfayı Çalıştır
-pg.run()
+# 6. Seçilen Sayfayı Render Etme
+PAGE_MAP = {
+    "📡 Dashboard": dashboard.render,
+    "🏢 Org Setup": org_setup.render,
+    "⚡ Senaryolar": scenarios.render,
+    "🧠 Hafıza": memory.render,
+    "⚙️ Ayarlar": settings.render,
+}
+
+PAGE_MAP[page]()
