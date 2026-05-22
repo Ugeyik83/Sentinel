@@ -1,12 +1,12 @@
 """
 signals/collectors/political.py
-GDELT ve NewsAPI politik sinyal toplama.
+Türkiye haberleri — NewsAPI
 """
 
 import logging
 import os
 import requests
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -16,45 +16,16 @@ class PoliticalCollector:
         self.newsapi_key = os.environ.get("NEWSAPI_KEY", "")
 
     def collect(self) -> list:
-        signals = []
-        signals.extend(self._gdelt())
-        if self.newsapi_key:
-            signals.extend(self._newsapi())
-        return signals
-
-    def _gdelt(self) -> list:
-        """GDELT conflict score — Türkiye odaklı."""
-        try:
-            yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d%H%M%S")
-            url = (
-                f"https://api.gdeltproject.org/api/v2/tv/tv?"
-                f"query=Turkey+economy&mode=timelinevolinfo&format=json"
-                f"&startdatetime={yesterday}&timespan=24h"
-            )
-            resp = requests.get(url, timeout=15)
-            data = resp.json()
-            value = len(data.get("timeline", []))
-            return [{
-                "source": "gdelt",
-                "category": "geopolitical",
-                "metric": "gdelt_conflict_score",
-                "title": "GDELT Türkiye çatışma skoru",
-                "value": min(value, 10),
-                "min": 0,
-                "max": 10,
-                "weight": 0.9,
-                "collected_at": datetime.now(timezone.utc).isoformat(),
-            }]
-        except Exception as e:
-            logger.warning(f"GDELT hata: {e}")
+        if not self.newsapi_key:
+            logger.info("NEWSAPI_KEY tanımlı değil — haber sinyali atlandı.")
             return []
+        return self._newsapi_turkey()
 
-    def _newsapi(self) -> list:
-        """NewsAPI — Türkiye ekonomi ve siyaset haberleri."""
+    def _newsapi_turkey(self) -> list:
         try:
             url = "https://newsapi.org/v2/everything"
             params = {
-                "q": "Turkey economy OR Türkiye ekonomi",
+                "q": "Türkiye ekonomi OR Turkey economy OR dolar kur",
                 "language": "tr",
                 "sortBy": "publishedAt",
                 "pageSize": 10,
@@ -67,16 +38,17 @@ class PoliticalCollector:
                 signals.append({
                     "source": "newsapi",
                     "category": "political",
-                    "metric": "news_volume",
-                    "title": article.get("title", ""),
-                    "summary": article.get("description", ""),
+                    "metric": "tr_news",
+                    "title": article.get("title", "")[:120],
+                    "summary": article.get("description", "")[:200],
                     "url": article.get("url", ""),
                     "value": 1,
                     "min": 0,
                     "max": 1,
-                    "weight": 0.6,
+                    "weight": 0.7,
                     "collected_at": datetime.now(timezone.utc).isoformat(),
                 })
+            logger.info(f"NewsAPI: {len(signals)} haber alındı")
             return signals
         except Exception as e:
             logger.warning(f"NewsAPI hata: {e}")
