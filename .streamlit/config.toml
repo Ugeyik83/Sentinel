@@ -1,14 +1,10 @@
 [theme]
 base = "light"
 primaryColor = "#0F62FE"
-backgroundColor = "#F8F9FB"
+backgroundColor = "#F0F2F5"
 secondaryBackgroundColor = "#FFFFFF"
-textColor = "#161616"
+textColor = "#1A202C"
 font = "sans serif"
 
 [client]
 showSidebarNavigation = false
-
-[server]
-enableCORS = false
-enableXsrfProtection = true
