@@ -23,15 +23,19 @@ with st.sidebar:
     st.markdown("## 🛡️ SENTINEL")
     st.caption("AI-Powered Enterprise Resilience Platform")
     st.divider()
-    page = st.radio("", options=[
-        "📡 Dashboard",
-        "🏢 Org Setup",
-        "⚡ Senaryolar",
-        "⚙️ Simülasyon",
-        "📊 Rapor",
-        "🧠 Hafıza",
-        "⚙️ Ayarlar",
-    ], label_visibility="collapsed")
+    page = st.radio(
+        "Navigasyon",
+        options=[
+            "📡 Dashboard",
+            "🏢 Org Setup",
+            "⚡ Senaryolar",
+            "⚙️ Simülasyon",
+            "📊 Rapor",
+            "🧠 Hafıza",
+            "⚙️ Ayarlar",
+        ],
+        label_visibility="collapsed"
+    )
     st.divider()
     st.caption(f"Model: `{os.environ.get('LLM_MODEL_NAME', 'gpt-4o')}`")
     st.caption("Veri: Lokal · Harici veri çıkmaz")
