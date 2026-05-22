@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 CATALOG_DIR = Path("scenarios/catalog")
 
 SYSTEM = """Sen IGYA (İnci GS Yuasa) şirketi için kurumsal risk senaryosu uzmanısın.
-IGYA Manisa'da kurulu, endüstriyel ve otomotiv bataryası üretiyor, 
-Suudi Arabistan, Almanya, İtalya başta olmak üzere ihracat yapıyor.
+IGYA Manisa'da kurulu, endüstriyel ve otomotiv bataryası üretiyor.
 
 Kullanıcının verdiği GEREKSİNİMİ dikkate alarak DOĞRUDAN O KONUYA özgü 
 risk senaryoları üret. Genel şirket riskleri değil, gereksinimde belirtilen 
@@ -113,10 +112,25 @@ class ScenarioGenerator:
             reverse=True
         )[:8]
         nodes_str = ", ".join(n.get("label", n.get("id", "?")) for n in top_nodes)
+
+        # İhracat pazarlarını config'den dinamik çek
+        markets_str = ""
+        try:
+            import yaml
+            markets_path = Path("config/export_markets.yaml")
+            if markets_path.exists():
+                markets = yaml.safe_load(markets_path.read_text()).get("markets", [])
+                if markets:
+                    market_names = [m["country"] for m in markets[:5]]
+                    markets_str = f", İhracat pazarları: {', '.join(market_names)}"
+        except Exception:
+            pass
+
         return (
             f"Domain: {meta.get('domain', 'ERM')}, "
             f"Temalar: {', '.join(meta.get('key_themes', ['risk', 'finance', 'operations']))}, "
             f"Pozisyonlar: {nodes_str}"
+            f"{markets_str}"
         )
 
     def _load_catalog_scenarios(self, signals: list) -> list:
