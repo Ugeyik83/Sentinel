@@ -1,6 +1,5 @@
 """
-streamlit_app/main.py — SENTINEL v5
-st.navigation API — sidebar her zaman görünür.
+streamlit_app/main.py — SENTINEL v6
 """
 
 import streamlit as st
@@ -15,7 +14,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── CSS ───────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap');
@@ -56,19 +54,12 @@ div[data-testid="stExpander"] {
     margin-bottom: 8px !important;
 }
 
-h1 {
-    font-size: 22px !important;
-    font-weight: 600 !important;
-    color: #1A202C !important;
-}
+h1 { font-size: 22px !important; font-weight: 600 !important; color: #1A202C !important; }
 
-[data-testid="stMetricValue"] {
-    font-family: 'IBM Plex Mono', monospace !important;
-}
+[data-testid="stMetricValue"] { font-family: 'IBM Plex Mono', monospace !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Navigation ────────────────────────────────────────────────────────────────
 from streamlit_app.pages import (
     dashboard, org_setup, scenarios,
     simulate, report, memory, settings
@@ -98,11 +89,11 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-pg = st.navigation(pages, position="sidebar")
+pg = st.navigation(pages)
 
 with st.sidebar:
     st.markdown("""
-    <div style="padding:12px 16px; border-top:1px solid #EDF2F7; margin-top:16px;">
+    <div style="padding:12px 16px; border-top:1px solid #EDF2F7; margin-top:8px;">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
             <div style="width:7px;height:7px;background:#48BB78;border-radius:50%;"></div>
             <span style="color:#718096;font-size:11px;">Sistem Aktif</span>
