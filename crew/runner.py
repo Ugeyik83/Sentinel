@@ -1,7 +1,6 @@
 """
 crew/runner.py
 CrewAI simülasyon çalıştırıcı.
-Hiyerarşik veya Konsensüs — senaryoya göre seçilir.
 """
 
 import json
@@ -26,27 +25,15 @@ class SimulationRunner:
 
     def run(self, scenario: dict) -> dict:
         mode = scenario.get("simulation_mode", "hierarchical")
-        logger.info(f"Simülasyon başlıyor: {scenario['name']} | mod: {mode}")
+        logger.info(f"Simülasyon: {scenario['name']} | mod: {mode}")
 
         tasks = self.task_builder.build_tasks(scenario, self.agents)
-        process = (
-            Process.hierarchical if mode == "hierarchical"
-            else Process.sequential
-        )
 
-        manager = self.agents.get("managing_director") if mode == "hierarchical" else None
+        if mode == "hierarchical":
+            result = self._run_hierarchical(tasks)
+        else:
+            result = self._run_sequential(tasks)
 
-        crew = Crew(
-            agents=list(self.agents.values()),
-            tasks=tasks,
-            process=process,
-            manager_agent=manager,
-            verbose=True,
-        )
-
-        result = crew.kickoff()
-
-        # Sonucu kaydet
         output = {
             "scenario_id": scenario.get("id"),
             "scenario_name": scenario.get("name"),
@@ -59,5 +46,54 @@ class SimulationRunner:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(json.dumps(output, ensure_ascii=False, indent=2))
 
-        logger.info(f"Simülasyon tamamlandı: {scenario['name']}")
         return output
+
+    def _run_hierarchical(self, tasks):
+        """
+        Hierarchical modda manager agent agents listesinde OLMAMALI.
+        Manager ayrı parametre olarak geçilir.
+        """
+        manager = self.agents.get("managing_director")
+
+        # Manager'ı agents listesinden çıkar
+        worker_agents = [
+            agent for agent_id, agent in self.agents.items()
+            if agent_id != "managing_director"
+        ]
+
+        # Task'ların agent'larını da filtrele — MD task'ı sequential'a bırak
+        worker_tasks = [t for t in tasks if t.agent != manager]
+        md_tasks = [t for t in tasks if t.agent == manager]
+
+        crew = Crew(
+            agents=worker_agents,
+            tasks=worker_tasks,
+            process=Process.hierarchical,
+            manager_agent=manager,
+            verbose=True,
+        )
+        result = crew.kickoff()
+
+        # MD kararını sequential olarak al
+        if md_tasks and manager:
+            md_crew = Crew(
+                agents=[manager],
+                tasks=md_tasks,
+                process=Process.sequential,
+                verbose=True,
+            )
+            md_result = md_crew.kickoff()
+            return f"{result}\n\n=== YÖNETİM KARARI ===\n{md_result}"
+
+        return result
+
+    def _run_sequential(self, tasks):
+        """Consensus modu — tüm ajanlar sırayla çalışır."""
+        all_agents = list(self.agents.values())
+        crew = Crew(
+            agents=all_agents,
+            tasks=tasks,
+            process=Process.sequential,
+            verbose=True,
+        )
+        return crew.kickoff()
