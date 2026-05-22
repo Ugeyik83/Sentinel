@@ -1,7 +1,7 @@
 """
 streamlit_app/pages/scenarios.py
 Katalog + otomatik senaryo üretimi.
-Dosya yükleme + URL desteği eklendi.
+Seçili haberlerden gereksinim oluşturma eklendi.
 """
 
 import streamlit as st
@@ -45,14 +45,52 @@ def _render_catalog():
 def _render_generator():
     st.info("Sinyalsiz de çalışır — LLM gereksinimi analiz eder ve senaryo üretir.")
 
+    # ── Haber seçici ─────────────────────────────────────────────────────────
+    news_signals = _load_news_signals()
+    if news_signals:
+        with st.expander(f"📰 Güncel Haberlerden Seç ({len(news_signals)} haber)", expanded=False):
+            st.caption("Seçtiğin haberler otomatik olarak gereksinim kutusuna eklenir.")
+
+            selected_news = []
+            label_colors = {"güncel": "🔵", "ekonomi-siyaset": "🟠", "iç siyaset": "🟣"}
+
+            for i, news in enumerate(news_signals[:20]):
+                title = news.get("title", "")
+                label = news.get("label", "")
+                icon = label_colors.get(label, "⚪")
+                checked = st.checkbox(
+                    f"{icon} {title}",
+                    key=f"news_sel_{i}",
+                    value=False
+                )
+                if checked:
+                    selected_news.append(news)
+
+            if selected_news:
+                st.caption(f"✅ {len(selected_news)} haber seçildi")
+                if st.button("➕ Seçili Haberleri Gereksinime Ekle", type="secondary"):
+                    news_text = _build_news_context(selected_news)
+                    existing = st.session_state.get("last_requirement", "")
+                    if existing and not existing.endswith("\n"):
+                        existing += "\n"
+                    st.session_state["last_requirement"] = existing + news_text
+                    st.session_state["news_added"] = True
+                    st.rerun()
+
+        if st.session_state.get("news_added"):
+            st.success("✅ Haberler gereksinim kutusuna eklendi.")
+            st.session_state["news_added"] = False
+
+    # ── Gereksinim kutusu ─────────────────────────────────────────────────────
     requirement = st.text_area(
         "Simülasyon gereksinimi",
-        height=100,
-        placeholder="Örnek: Türkiye'deki politik kaos IGYA'yı 90 günde nasıl etkiler?",
+        height=150,
+        placeholder="Örnek: Türkiye'deki politik kaos IGYA'yı 90 günde nasıl etkiler?\n\nYa da üstten haber seçip buraya ekleyebilirsin.",
         value=st.session_state.get("last_requirement", ""),
+        key="req_input"
     )
 
-    # ── Ek içerik kaynakları ─────────────────────────────────────────────────
+    # ── Ek kaynak ─────────────────────────────────────────────────────────────
     with st.expander("📎 Ek Kaynak Ekle (opsiyonel)", expanded=False):
         st.caption("Dosya veya URL eklerseniz içerik gereksinimle birlikte analiz edilir.")
         col_f, col_u = st.columns(2)
@@ -60,13 +98,11 @@ def _render_generator():
             uploaded_file = st.file_uploader(
                 "Dosya yükle",
                 type=["pdf", "docx", "txt", "md", "csv", "xlsx"],
-                help="Haber, rapor, politika belgesi, KRY envanteri..."
             )
         with col_u:
             url_input = st.text_input(
                 "Web sitesi URL'si",
-                placeholder="https://www.bloomberght.com/...",
-                help="Haber sitesi, rapor sayfası..."
+                placeholder="https://...",
             )
 
     col1, col2 = st.columns(2)
@@ -76,29 +112,21 @@ def _render_generator():
     if st.button("🔄 Senaryo Üret", type="primary", disabled=not requirement.strip()):
         st.session_state["last_requirement"] = requirement
 
-        # Ek içerik topla
+        # Ek içerik
         extra_context = ""
-
-        # Dosya içeriği
         if uploaded_file:
             with st.spinner(f"📄 `{uploaded_file.name}` okunuyor..."):
                 extra_context += _extract_file(uploaded_file)
-
-        # URL içeriği
         if url_input and url_input.strip().startswith("http"):
-            with st.spinner(f"🌐 URL içeriği çekiliyor..."):
+            with st.spinner("🌐 URL çekiliyor..."):
                 extra_context += _extract_url(url_input.strip())
 
-        # Gereksinim + ek içerik birleştir
         full_requirement = requirement
         if extra_context:
-            full_requirement = (
-                f"{requirement}\n\n"
-                f"--- Ek Kaynak İçeriği ---\n{extra_context[:6000]}"
-            )
-            st.caption(f"✅ Ek içerik eklendi: {len(extra_context):,} karakter")
+            full_requirement = f"{requirement}\n\n--- Ek Kaynak ---\n{extra_context[:6000]}"
+            st.caption(f"✅ Ek içerik: {len(extra_context):,} karakter")
 
-        # Sinyal dosyası
+        # Sinyaller
         signals_path = Path("uploads/runs/latest_signals.json")
         signals = []
         if signals_path.exists():
@@ -127,7 +155,7 @@ def _render_generator():
                 st.error(f"Üretim hatası: {e}")
                 return
 
-    # Üretilen senaryoları göster
+    # ── Üretilen senaryolar ───────────────────────────────────────────────────
     scenarios = st.session_state.get("generated_scenarios", [])
     if scenarios:
         st.divider()
@@ -155,7 +183,7 @@ def _render_generator():
                 roles = scenario.get("affected_roles", [])
                 if roles:
                     st.caption(f"**Etkilenen roller:** {', '.join(roles)}")
-                if st.button(f"▶️ Bu senaryoyu simüle et",
+                if st.button("▶️ Bu senaryoyu simüle et",
                              key=f"gen_run_{scenario.get('id', i)}", type="primary"):
                     st.session_state["active_scenario"] = scenario
                     st.success("✅ Senaryo seçildi. Sol menüden **Simülasyon** sekmesine geçin.")
@@ -169,8 +197,38 @@ def _render_generator():
         )
 
 
+def _load_news_signals() -> list:
+    """latest_signals.json'dan haber sinyallerini çek."""
+    signals_path = Path("uploads/runs/latest_signals.json")
+    if not signals_path.exists():
+        return []
+    try:
+        all_signals = json.loads(signals_path.read_text())
+        news = [s for s in all_signals if s.get("category") == "political"]
+        # Yayın tarihine göre sırala
+        news.sort(
+            key=lambda x: x.get("published_at", x.get("collected_at", "")),
+            reverse=True
+        )
+        return news
+    except Exception:
+        return []
+
+
+def _build_news_context(selected_news: list) -> str:
+    """Seçili haberlerden gereksinim metni oluştur."""
+    lines = ["Aşağıdaki güncel Türkiye haberleri dikkate alınarak IGYA'ya etkisi analiz edilsin:\n"]
+    for news in selected_news:
+        title = news.get("title", "")
+        summary = news.get("summary", "")
+        pub = news.get("published_at", "")[:10]
+        lines.append(f"• [{pub}] {title}")
+        if summary:
+            lines.append(f"  {summary}")
+    return "\n".join(lines)
+
+
 def _extract_file(uploaded_file) -> str:
-    """Yüklenen dosyadan metin çıkar."""
     try:
         import tempfile, os
         suffix = Path(uploaded_file.name).suffix.lower()
@@ -186,18 +244,15 @@ def _extract_file(uploaded_file) -> str:
 
 
 def _extract_url(url: str) -> str:
-    """URL'den metin çek."""
     try:
         import requests
         from bs4 import BeautifulSoup
         headers = {"User-Agent": "Mozilla/5.0"}
         resp = requests.get(url, timeout=10, headers=headers)
         soup = BeautifulSoup(resp.text, "html.parser")
-        # Script ve style'ları kaldır
         for tag in soup(["script", "style", "nav", "footer", "header"]):
             tag.decompose()
         text = soup.get_text(separator="\n", strip=True)
-        # Boş satırları temizle
         lines = [l for l in text.splitlines() if len(l.strip()) > 30]
         return f"\n[URL: {url}]\n" + "\n".join(lines[:200]) + "\n"
     except Exception as e:
