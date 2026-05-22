@@ -8,3 +8,9 @@ font = "sans serif"
 
 [client]
 showSidebarNavigation = false
+
+[ui]
+hideSidebarNav = true
+
+[server]
+enableCORS = false

@@ -177,6 +177,10 @@ h1 {
 }
 
 /* ── Scrollbar ── */
+/* Sidebar collapse butonu gizle */
+[data-testid="stSidebarCollapseButton"] { display: none !important; }
+[data-testid="collapsedControl"] { display: none !important; }
+
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: #CBD5E0; border-radius: 10px; }
 </style>
@@ -264,3 +268,5 @@ PAGE_MAP = {
 }
 
 PAGE_MAP[page]()
+# Not: Bu satır dosya sonuna EKLENMEYECEK
+# main_v4.py içindeki CSS bloğuna şu satırı ekle:
