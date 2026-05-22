@@ -1,0 +1,21 @@
+edge_propagation:
+  TRIGGERS: 0.85
+  IMPACTS: 0.75
+  DEPENDS_ON: 0.70
+  BLOCKS: 0.60
+  REQUIRES: 0.65
+  SUPPLIES: 0.55
+  OWNS: 0.30
+  APPROVES: 0.20
+  MITIGATES: -0.40
+  AUDITS: -0.25
+  ESCALATES: 0.80
+  CONCURRENT_WITH: 0.50
+  PRECEDES: 0.40
+  DELEGATES_TO: 0.20
+  REPORTS_TO: 0.15
+
+propagation:
+  max_depth: 4
+  min_delta_threshold: 0.05
+  dampening_per_hop: 0.80

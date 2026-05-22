@@ -1,0 +1,22 @@
+operasyonel:
+  - SUPPLIES
+  - DEPENDS_ON
+  - OWNS
+  - REQUIRES
+  - BLOCKS
+
+yetki:
+  - APPROVES
+  - DELEGATES_TO
+  - REPORTS_TO
+  - AUDITS
+
+etki:
+  - IMPACTS
+  - TRIGGERS
+  - MITIGATES
+  - ESCALATES
+
+zaman:
+  - PRECEDES
+  - CONCURRENT_WITH

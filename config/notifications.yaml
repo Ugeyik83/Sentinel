@@ -1,0 +1,26 @@
+channels:
+  email:
+    enabled: false
+    smtp_host: ""
+    smtp_port: 587
+    sender: ""
+    recipients: []
+
+  slack:
+    enabled: false
+    webhook_url: ""
+    channel: "#sentinel-alerts"
+
+  teams:
+    enabled: false
+    webhook_url: ""
+
+alert_levels:
+  critical:
+    channels: ["email", "slack", "teams"]
+  high:
+    channels: ["slack"]
+  medium:
+    channels: ["slack"]
+  low:
+    channels: []

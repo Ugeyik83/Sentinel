@@ -1,0 +1,40 @@
+scenarios:
+  - id: cfo_vs_isg_production_halt
+    name: "CFO Maliyet Kesintisi vs ISG Operasyon Durdurma"
+    description: >
+      CFO maliyet baskısı nedeniyle ISG yatırımlarını kısıtlamak istiyor.
+      ISG Müdürü operasyonel risk nedeniyle durdurma talep ediyor.
+      COO üretim sürekliliğini savunuyor.
+    trigger: "cost_cut_pressure AND isg_incident_risk"
+    affected_roles:
+      - director_business_services_cfo
+      - quality_manager
+      - director_factory_operations
+    simulation_mode: consensus
+    time_horizon_days: 30
+
+  - id: it_vs_operations_erp_outage
+    name: "SAP/ERP Kesintisi — IT vs Operasyon"
+    description: >
+      ERP sistemi çöktü. IT sistemi kurtarmak için zaman istiyor.
+      Operasyon manuel devam etmek istiyor. CFO her iki maliyeti değerlendiriyor.
+    trigger: "erp_outage AND production_pressure"
+    affected_roles:
+      - it_manager
+      - director_factory_operations
+      - director_business_services_cfo
+    simulation_mode: hierarchical
+    time_horizon_days: 7
+
+  - id: sales_vs_logistics_delivery
+    name: "Satış Taahhüdü vs Lojistik Kapasite"
+    description: >
+      Satış ekibi büyük ihracat siparişi taahhüt etti.
+      Lojistik mevcut kapasiteyle karşılayamıyor.
+    trigger: "large_order AND logistics_capacity_constraint"
+    affected_roles:
+      - director_sales_marketing
+      - director_planning_logistics
+      - director_factory_operations
+    simulation_mode: consensus
+    time_horizon_days: 45

@@ -1,0 +1,55 @@
+scenarios:
+  - id: saso_expiry_active_order
+    name: "SASO Belgesi Süresi Dolumu + Aktif İhracat Siparişi"
+    description: >
+      SASO sertifikasının süresi 30 gün içinde dolacak.
+      Aynı anda Suudi Arabistan'a aktif sevkiyat siparişi mevcut.
+    trigger: "saso_expiry_days < 30 AND active_sa_order"
+    affected_roles:
+      - director_planning_logistics
+      - director_sales_marketing
+      - legal_counsel
+    simulation_mode: hierarchical
+    time_horizon_days: 30
+
+  - id: iso_audit_concurrent_incident
+    name: "ISO 45001 Denetimi + Eş Zamanlı İş Kazası"
+    description: >
+      Dış denetçi ISO 45001 denetimi için fabrikada.
+      Aynı gün iş kazası rapor edildi.
+    trigger: "iso_audit_scheduled AND isg_incident_reported"
+    affected_roles:
+      - quality_manager
+      - director_factory_operations
+      - hr_manager
+      - legal_counsel
+    simulation_mode: hierarchical
+    time_horizon_days: 14
+
+  - id: kvkk_data_breach
+    name: "KVKK Veri İhlali + Müşteri Verisi Riski"
+    description: >
+      IT sisteminde potansiyel veri sızıntısı tespit edildi.
+      Müşteri ve çalışan kişisel verisi risk altında olabilir.
+    trigger: "it_anomaly AND personal_data_exposure_risk"
+    affected_roles:
+      - it_manager
+      - legal_counsel
+      - director_business_services_cfo
+      - hr_manager
+    simulation_mode: hierarchical
+    time_horizon_days: 7
+
+  - id: currency_crisis_export_impact
+    name: "Kur Krizi + İhracat Geliri Erimesi"
+    description: >
+      USD/TRY %8 üzeri ani yükseliş. İhracat geliri TRY bazında eriyor,
+      hammadde ithalat maliyeti artıyor.
+    trigger: "usd_try_change_pct >= 8"
+    affected_roles:
+      - director_business_services_cfo
+      - director_sales_marketing
+      - director_planning_logistics
+      - purchasing_manager
+    simulation_mode: hierarchical
+    time_horizon_days: 90

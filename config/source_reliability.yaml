@@ -1,0 +1,45 @@
+sources:
+  tcmb:
+    reliability: 1.00
+    tier: 1
+    latency_minutes: 5
+
+  fred:
+    reliability: 0.98
+    tier: 1
+    latency_minutes: 60
+
+  bist:
+    reliability: 0.97
+    tier: 1
+    latency_minutes: 5
+
+  reuters:
+    reliability: 0.85
+    tier: 2
+    latency_minutes: 15
+
+  bloomberg:
+    reliability: 0.92
+    tier: 2
+    latency_minutes: 5
+
+  newsapi:
+    reliability: 0.70
+    tier: 3
+    latency_minutes: 30
+
+  gdelt:
+    reliability: 0.75
+    tier: 3
+    latency_minutes: 15
+
+  yahoo_finance:
+    reliability: 0.80
+    tier: 2
+    latency_minutes: 10
+
+  random_rss:
+    reliability: 0.30
+    tier: 4
+    latency_minutes: 60

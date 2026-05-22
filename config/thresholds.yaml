@@ -1,0 +1,23 @@
+economic:
+  usd_try_change_pct: 5.0
+  eur_try_change_pct: 5.0
+  bist_drop_pct: 3.0
+  inflation_monthly_pct: 5.0
+  interest_rate_change_pct: 2.0
+
+geopolitical:
+  gdelt_conflict_score: 7.0
+  country_risk_score: 70
+
+export_market:
+  currency_volatility_pct: 8.0
+  country_risk_score: 70
+
+sectoral:
+  lead_price_change_pct: 10.0
+  battery_index_change_pct: 8.0
+
+weak_signal:
+  anomaly_z_score: 2.0
+  volatility_ratio: 1.8
+  min_confidence: 0.60

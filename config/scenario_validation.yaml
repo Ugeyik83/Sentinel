@@ -1,0 +1,12 @@
+validation_rules:
+  require_graph_path: true
+  min_evidence_count: 3
+  max_llm_weight: 0.30
+  min_source_reliability: 0.60
+  require_typed_edges: true
+  max_entities_per_scenario: 15
+
+  consistency_checks:
+    - no_contradictory_signals
+    - temporal_coherence
+    - entity_existence

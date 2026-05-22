@@ -1,0 +1,216 @@
+{
+  "organization": "IGYA — İnci GS Yuasa",
+  "hierarchy": {
+    "id": "managing_director",
+    "role": "Managing Director",
+    "level": 0,
+    "simulation_mode": "hierarchical",
+    "decision_authority": "final",
+    "reports_to": null,
+    "delegates_to": [
+      {
+        "id": "legal_counsel",
+        "role": "Legal Counsel",
+        "level": 1,
+        "decision_authority": "advisory",
+        "domain": ["legal", "compliance", "contracts"],
+        "delegates_to": []
+      },
+      {
+        "id": "director_rd",
+        "role": "Director R&D",
+        "level": 1,
+        "decision_authority": "functional",
+        "domain": ["research", "development", "innovation", "technology"],
+        "delegates_to": []
+      },
+      {
+        "id": "quality_manager",
+        "role": "Quality Department Manager",
+        "level": 1,
+        "decision_authority": "functional",
+        "domain": ["quality", "iso", "audit", "standards"],
+        "delegates_to": []
+      },
+      {
+        "id": "purchasing_manager",
+        "role": "Purchasing Department Manager",
+        "level": 1,
+        "decision_authority": "functional",
+        "domain": ["procurement", "suppliers", "sourcing", "supply_chain"],
+        "delegates_to": []
+      },
+      {
+        "id": "hr_manager",
+        "role": "Human Resources Manager",
+        "level": 1,
+        "decision_authority": "functional",
+        "domain": ["human_resources", "talent", "training", "culture"],
+        "delegates_to": []
+      },
+      {
+        "id": "director_factory_operations",
+        "role": "Director Factory Operations",
+        "level": 1,
+        "decision_authority": "functional",
+        "domain": ["production", "manufacturing", "operations", "engineering"],
+        "delegates_to": [
+          {
+            "id": "production_manager_str1",
+            "role": "Production Manager STR-1",
+            "level": 2,
+            "decision_authority": "operational",
+            "domain": ["production", "str1_line"],
+            "delegates_to": []
+          },
+          {
+            "id": "production_manager_str2",
+            "role": "Production Manager STR-2",
+            "level": 2,
+            "decision_authority": "operational",
+            "domain": ["production", "str2_line"],
+            "delegates_to": []
+          },
+          {
+            "id": "production_manager_ind",
+            "role": "Production Manager IND",
+            "level": 2,
+            "decision_authority": "operational",
+            "domain": ["production", "ind_line"],
+            "delegates_to": []
+          },
+          {
+            "id": "engineering_manager",
+            "role": "Engineering Department Manager",
+            "level": 2,
+            "decision_authority": "operational",
+            "domain": ["engineering", "maintenance", "capex"],
+            "delegates_to": []
+          }
+        ]
+      },
+      {
+        "id": "director_planning_logistics",
+        "role": "Director Planning & Logistics",
+        "level": 1,
+        "decision_authority": "functional",
+        "domain": ["planning", "logistics", "export", "saso", "customs", "supply_planning"],
+        "delegates_to": []
+      },
+      {
+        "id": "director_business_services_cfo",
+        "role": "Director Business Services / CFO",
+        "level": 1,
+        "decision_authority": "functional",
+        "domain": ["finance", "financial_control", "risk_management", "it", "reporting", "budget"],
+        "vacant": true,
+        "delegates_to": [
+          {
+            "id": "finance_control_manager",
+            "role": "Finance & Financial Control Manager",
+            "level": 2,
+            "decision_authority": "operational",
+            "domain": ["finance", "budget", "reporting", "currency_risk", "cash_flow"],
+            "delegates_to": []
+          },
+          {
+            "id": "internal_control_risk_manager",
+            "role": "Internal Control & Risk Management Manager",
+            "level": 2,
+            "decision_authority": "operational",
+            "domain": ["internal_control", "risk_management", "erm", "audit", "compliance"],
+            "delegates_to": []
+          },
+          {
+            "id": "it_manager",
+            "role": "Information Systems & Technologies Manager",
+            "level": 2,
+            "decision_authority": "operational",
+            "domain": ["it", "erp", "sap", "cybersecurity", "digital"],
+            "delegates_to": []
+          }
+        ]
+      },
+      {
+        "id": "director_sales_marketing",
+        "role": "Director Sales & Marketing",
+        "level": 1,
+        "decision_authority": "functional",
+        "domain": ["sales", "marketing", "revenue", "market_share", "customer"],
+        "vacant": true,
+        "delegates_to": [
+          {
+            "id": "afm_domestic_sales_manager",
+            "role": "AFM Domestic Sales Manager",
+            "level": 2,
+            "decision_authority": "operational",
+            "domain": ["domestic_sales", "afm", "local_market"],
+            "delegates_to": []
+          },
+          {
+            "id": "international_sales_manager",
+            "role": "International Sales Manager",
+            "level": 2,
+            "decision_authority": "operational",
+            "domain": ["international_sales", "export_markets", "distributors"],
+            "delegates_to": [
+              {
+                "id": "key_account_manager",
+                "role": "GS Yuasa / Europe & OE Key Account Manager",
+                "level": 3,
+                "decision_authority": "operational",
+                "domain": ["gs_yuasa", "europe", "oe", "key_accounts"],
+                "delegates_to": []
+              }
+            ]
+          },
+          {
+            "id": "ind_battery_sales_manager",
+            "role": "IND Battery Sales & After Sales Manager",
+            "level": 2,
+            "decision_authority": "operational",
+            "domain": ["ind_battery", "after_sales", "service"],
+            "delegates_to": []
+          },
+          {
+            "id": "trade_marketing_manager",
+            "role": "Trade Marketing & Pricing Manager",
+            "level": 2,
+            "decision_authority": "operational",
+            "domain": ["trade_marketing", "pricing", "promotions"],
+            "delegates_to": []
+          },
+          {
+            "id": "corporate_communication_manager",
+            "role": "Corporate Communication & Marketing Manager",
+            "level": 2,
+            "decision_authority": "operational",
+            "domain": ["corporate_communication", "marketing", "brand", "pr"],
+            "delegates_to": []
+          }
+        ]
+      }
+    ]
+  },
+  "simulation_config": {
+    "default_mode": "hierarchical",
+    "consensus_roles": [
+      "managing_director",
+      "director_factory_operations",
+      "director_planning_logistics",
+      "director_business_services_cfo",
+      "director_sales_marketing",
+      "quality_manager"
+    ],
+    "vacant_positions": [
+      "director_business_services_cfo",
+      "director_sales_marketing"
+    ],
+    "crisis_escalation_path": [
+      "operational_manager",
+      "director",
+      "director_business_services_cfo",
+      "managing_director"
+    ]
+  }
+}

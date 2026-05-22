@@ -1,0 +1,36 @@
+markets:
+  - country: "Suudi Arabistan"
+    code: "SA"
+    currency: "SAR"
+    certifications: ["SASO"]
+    priority: high
+
+  - country: "Almanya"
+    code: "DE"
+    currency: "EUR"
+    certifications: ["CE"]
+    priority: high
+
+  - country: "İtalya"
+    code: "IT"
+    currency: "EUR"
+    certifications: ["CE"]
+    priority: high
+
+  - country: "Fransa"
+    code: "FR"
+    currency: "EUR"
+    certifications: ["CE"]
+    priority: medium
+
+  - country: "Mısır"
+    code: "EG"
+    currency: "EGP"
+    certifications: []
+    priority: medium
+
+  - country: "Birleşik Arap Emirlikleri"
+    code: "AE"
+    currency: "AED"
+    certifications: []
+    priority: medium

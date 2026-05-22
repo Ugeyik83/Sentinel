@@ -1,0 +1,28 @@
+jobs:
+  - name: "Sabah Brifing"
+    schedule: "0 7 * * *"
+    tasks:
+      - collect_signals
+      - generate_scenarios
+      - run_simulation
+      - send_report
+    enabled: true
+
+  - name: "Haftalık Özet"
+    schedule: "0 8 * * 1"
+    tasks:
+      - weekly_summary
+    enabled: true
+
+  - name: "Alert Kontrolü"
+    schedule: "*/15 * * * *"
+    tasks:
+      - check_thresholds
+      - weak_signal_check
+    enabled: true
+
+  - name: "Kaynak Kalibrasyon"
+    schedule: "0 0 * * 0"
+    tasks:
+      - calibrate_source_reliability
+    enabled: true
