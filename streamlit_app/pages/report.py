@@ -64,10 +64,9 @@ def render():
     if verdict_path.exists():
         try:
             verdict = json.loads(verdict_path.read_text())
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Tahmin", verdict.get("predicted_outcome", "—")[:40])
+            col1, col2 = st.columns(2)
+            col1.metric("Tahmin", verdict.get("predicted_outcome", "—")[:50])
             col2.metric("Zaman Ufku", verdict.get("time_horizon", "—"))
-            col3.metric("Kritik Sinyal", len(verdict.get("key_signals", [])))
         except Exception:
             pass
 

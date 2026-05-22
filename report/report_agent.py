@@ -1,6 +1,5 @@
 """
 report/report_agent.py
-LLM → YK raporu (Markdown + PDF).
 """
 
 import json
@@ -18,11 +17,15 @@ Rapor bölümleri:
 2. Tetikleyen Sinyaller
 3. Risk Propagasyon Zinciri
 4. Simülasyon Bulguları
-5. Önerilen Aksiyonlar (sorumlu + süre + maliyet)
-6. Güven Değerlendirmesi
+5. Önerilen Aksiyonlar (sorumlu direktör + süre — maliyet tahmini yazma)
 7. Sonraki Adımlar
 
-MUTLAKA Türkçe yaz. Net, aksiyon odaklı."""
+KURALLAR:
+- MUTLAKA Türkçe yaz
+- Aksiyon başlıkları Türkçe olsun (HEDGE → Döviz Koruması, COMMUNICATE → Paydaş İletişimi, DIVERSIFY → Tedarik Çeşitlendirme, STOCKPILE → Stok Güçlendirme, INVESTMENT → Teknoloji Yatırımı, DELAY → Karar Erteleme, AUDIT → Denetim, ESCALATE → Üst Yönetime Eskalasyon, INSURANCE → Sigorta, POLICY_CHANGE → Politika Değişikliği)
+- Maliyet tahmini yazma — gerçekçi değil
+- Risk skoru veya güven skoru sayısal olarak yazma — bu değerler hesaplanamaz
+- Net, aksiyon odaklı yaz"""
 
 VERDICT_SYSTEM = """Rapor ve simülasyondan makine-okunabilir verdict üret.
 MUTLAKA Türkçe yaz.
@@ -30,7 +33,6 @@ MUTLAKA Türkçe yaz.
 SADECE JSON döndür:
 {
   "predicted_outcome": "kısa Türkçe tahmin özeti (max 60 karakter)",
-  "confidence_score": 0.0-1.0,
   "time_horizon": "30 gün veya 90 gün veya 180 gün",
   "key_signals": [
     {
@@ -39,13 +41,21 @@ SADECE JSON döndür:
       "description": "kısa Türkçe açıklama"
     }
   ],
-  "risk_scores": {
-    "Finansal": 0-100,
-    "Operasyonel": 0-100,
-    "Stratejik": 0-100
-  },
   "recommended_actions": ["Türkçe aksiyon 1", "Türkçe aksiyon 2"]
 }"""
+
+ACTION_NAME_MAP = {
+    "hedge": "Döviz Koruması",
+    "communicate": "Paydaş İletişimi",
+    "diversify": "Tedarik Çeşitlendirme",
+    "stockpile": "Stok Güçlendirme",
+    "investment": "Teknoloji Yatırımı",
+    "delay": "Karar Erteleme",
+    "audit": "Denetim",
+    "escalate": "Üst Yönetime Eskalasyon",
+    "insurance": "Sigorta",
+    "policy_change": "Politika Değişikliği",
+}
 
 
 class ReportAgent:
@@ -55,7 +65,13 @@ class ReportAgent:
 
     def generate(self, scenario: dict, simulation_result: dict,
                  actions: list, confidence: dict) -> dict:
-        context = self._build_context(scenario, simulation_result, actions, confidence)
+        # Aksiyon isimlerini Türkçeye çevir
+        for action in actions:
+            action_type = action.get("type", "").lower()
+            if action_type in ACTION_NAME_MAP:
+                action["type"] = ACTION_NAME_MAP[action_type]
+
+        context = self._build_context(scenario, simulation_result, actions)
 
         messages = [
             {"role": "system", "content": REPORT_SYSTEM},
@@ -63,7 +79,7 @@ class ReportAgent:
         ]
 
         report_md = chat(messages, model=self.model, max_tokens=4096, temperature=0.3)
-        verdict = self._generate_verdict(scenario, report_md, actions, confidence)
+        verdict = self._generate_verdict(scenario, report_md)
 
         report_dir = self.run_dir / "report"
         report_dir.mkdir(parents=True, exist_ok=True)
@@ -74,44 +90,33 @@ class ReportAgent:
 
         return {"report_md": report_md, "verdict": verdict}
 
-    def _build_context(self, scenario, result, actions, confidence) -> str:
+    def _build_context(self, scenario, result, actions) -> str:
         top_actions = "\n".join([
-            f"  {a['rank']}. {a['type'].upper()}: {a['description']} "
-            f"(etki: %{a.get('expected_impact_pct', 0)}, "
-            f"maliyet: {a.get('estimated_cost_try', 0):,} TL, "
-            f"süre: {a.get('implementation_days', 0)} gün)"
-            for a in actions[:5]
+            f"  {i+1}. {a.get('type','?')}: {a.get('description','')}"
+            f" — Sorumlu: {a.get('responsible_role_id','?')}"
+            f", Süre: {a.get('implementation_days','?')} gün"
+            for i, a in enumerate(actions[:5])
         ]) if actions else "Henüz aksiyon üretilmedi."
 
         return (
             f"Senaryo: {scenario.get('name')}\n"
-            f"Açıklama: {scenario.get('description')}\n"
-            f"Güven skoru: {confidence.get('confidence', 0)}\n"
-            f"Sinyal gücü: {confidence.get('signal_strength', '?')}\n\n"
+            f"Açıklama: {scenario.get('description')}\n\n"
             f"Simülasyon sonucu:\n{result.get('result', '')[:2000]}\n\n"
             f"Önerilen aksiyonlar:\n{top_actions}"
         )
 
-    def _generate_verdict(self, scenario, report_md, actions, confidence) -> dict:
+    def _generate_verdict(self, scenario, report_md) -> dict:
         messages = [
             {"role": "system", "content": VERDICT_SYSTEM},
-            {
-                "role": "user",
-                "content": (
-                    f"Senaryo: {scenario.get('name')}\n"
-                    f"Özet rapor:\n{report_md[:2000]}"
-                )
-            },
+            {"role": "user", "content": f"Senaryo: {scenario.get('name')}\n\nRapor:\n{report_md[:2000]}"},
         ]
         try:
             return chat_json(messages, model=self.model, temperature=0.2)
         except Exception as e:
-            logger.error(f"Verdict üretim hatası: {e}")
+            logger.error(f"Verdict hatası: {e}")
             return {
-                "predicted_outcome": scenario.get("name", "Bilinmiyor"),
-                "confidence_score": confidence.get("confidence", 0),
+                "predicted_outcome": scenario.get("name", ""),
                 "time_horizon": f"{scenario.get('time_horizon_days', 90)} gün",
                 "key_signals": [],
-                "risk_scores": {},
                 "recommended_actions": [],
             }
