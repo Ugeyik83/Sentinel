@@ -22,7 +22,30 @@ Rapor bölümleri:
 6. Güven Değerlendirmesi
 7. Sonraki Adımlar
 
-Türkçe, net, aksiyon odaklı yaz."""
+MUTLAKA Türkçe yaz. Net, aksiyon odaklı."""
+
+VERDICT_SYSTEM = """Rapor ve simülasyondan makine-okunabilir verdict üret.
+MUTLAKA Türkçe yaz.
+
+SADECE JSON döndür:
+{
+  "predicted_outcome": "kısa Türkçe tahmin özeti (max 60 karakter)",
+  "confidence_score": 0.0-1.0,
+  "time_horizon": "30 gün veya 90 gün veya 180 gün",
+  "key_signals": [
+    {
+      "signal": "sinyal adı (Türkçe)",
+      "severity": "high veya medium veya low",
+      "description": "kısa Türkçe açıklama"
+    }
+  ],
+  "risk_scores": {
+    "Finansal": 0-100,
+    "Operasyonel": 0-100,
+    "Stratejik": 0-100
+  },
+  "recommended_actions": ["Türkçe aksiyon 1", "Türkçe aksiyon 2"]
+}"""
 
 
 class ReportAgent:
@@ -40,10 +63,8 @@ class ReportAgent:
         ]
 
         report_md = chat(messages, model=self.model, max_tokens=4096, temperature=0.3)
-
         verdict = self._generate_verdict(scenario, report_md, actions, confidence)
 
-        # Kaydet
         report_dir = self.run_dir / "report"
         report_dir.mkdir(parents=True, exist_ok=True)
         (report_dir / "report.md").write_text(report_md, encoding="utf-8")
@@ -60,7 +81,8 @@ class ReportAgent:
             f"maliyet: {a.get('estimated_cost_try', 0):,} TL, "
             f"süre: {a.get('implementation_days', 0)} gün)"
             for a in actions[:5]
-        ])
+        ]) if actions else "Henüz aksiyon üretilmedi."
+
         return (
             f"Senaryo: {scenario.get('name')}\n"
             f"Açıklama: {scenario.get('description')}\n"
@@ -72,15 +94,7 @@ class ReportAgent:
 
     def _generate_verdict(self, scenario, report_md, actions, confidence) -> dict:
         messages = [
-            {
-                "role": "system",
-                "content": (
-                    "Rapor ve simülasyondan makine-okunabilir verdict üret. "
-                    "SADECE JSON: {predicted_outcome, confidence_score, "
-                    "time_horizon, key_signals: [{signal, severity, description}], "
-                    "risk_scores: {kategori: 0-100}, recommended_actions: [str]}"
-                )
-            },
+            {"role": "system", "content": VERDICT_SYSTEM},
             {
                 "role": "user",
                 "content": (
@@ -89,4 +103,15 @@ class ReportAgent:
                 )
             },
         ]
-        return chat_json(messages, model=self.model, temperature=0.2)
+        try:
+            return chat_json(messages, model=self.model, temperature=0.2)
+        except Exception as e:
+            logger.error(f"Verdict üretim hatası: {e}")
+            return {
+                "predicted_outcome": scenario.get("name", "Bilinmiyor"),
+                "confidence_score": confidence.get("confidence", 0),
+                "time_horizon": f"{scenario.get('time_horizon_days', 90)} gün",
+                "key_signals": [],
+                "risk_scores": {},
+                "recommended_actions": [],
+            }
