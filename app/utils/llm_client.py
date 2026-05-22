@@ -20,14 +20,12 @@ def get_client() -> OpenAI:
     return _client
 
 
-def get_llm():
-    """CrewAI için LLM nesnesi."""
-    from langchain_openai import ChatOpenAI
-    return ChatOpenAI(
-        model=os.environ.get("LLM_MODEL_NAME", "gpt-4o"),
-        api_key=os.environ.get("OPENAI_API_KEY", ""),
-        temperature=float(os.environ.get("LLM_TEMPERATURE", "0.7")),
-    )
+def get_llm() -> str:
+    """
+    CrewAI için LLM model adını string olarak döndür.
+    CrewAI 0.63+ string model adı kabul eder.
+    """
+    return os.environ.get("LLM_MODEL_NAME", "gpt-4o")
 
 
 def chat(messages: list, model: str = None, temperature: float = 0.7,
