@@ -42,8 +42,13 @@ class SimulationRunner:
             if mode == "hierarchical" else None
         )
 
+        # Manager agent agents listesinden çıkarılmalı
+        agent_list = list(self.agents.values())
+        if manager and manager in agent_list:
+            agent_list = [a for a in agent_list if a != manager]
+
         crew = Crew(
-            agents=list(self.agents.values()),
+            agents=agent_list,
             tasks=tasks,
             process=process,
             manager_agent=manager,
