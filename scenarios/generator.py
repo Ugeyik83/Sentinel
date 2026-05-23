@@ -1,6 +1,12 @@
 """
 scenarios/generator.py
 LLM + memory few-shot + sinyal → otomatik senaryo üretimi.
+
+DEĞİŞİKLİK (Session 3):
+  - signals.scoring.enrich_signals_with_scores import edildi
+  - generate() içinde impact_score + uncertainty otomatik hesaplanıyor
+  - Her senaryo artık impact_score, uncertainty, dominant_signals alanlarını içeriyor
+  - Katalog senaryoları için de sinyal bazlı skor ekleniyor
 """
 
 import json
@@ -11,6 +17,7 @@ from datetime import datetime, timezone
 from app.utils.llm_client import chat_json
 from scenarios.confidence import ConfidenceScorer
 from scenarios.validator import ScenarioValidator
+from signals.scoring import enrich_signals_with_scores   # ← YENİ
 
 logger = logging.getLogger(__name__)
 CATALOG_DIR = Path("scenarios/catalog")
@@ -52,6 +59,11 @@ class ScenarioGenerator:
     def generate(self, signals: list, graph: dict,
                  past_lessons: str = "", count: int = 3,
                  requirement: str = "") -> list:
+
+        # ── YENİ: Sinyal bazlı skor hesapla ──────────────────────────────
+        impact_result, uncertainty_result = enrich_signals_with_scores(signals)
+        # ─────────────────────────────────────────────────────────────────
+
         signal_summary = self._summarize_signals(signals)
         graph_summary = self._summarize_graph(graph)
 
@@ -80,6 +92,17 @@ class ScenarioGenerator:
             scenario["id"] = self._gen_id()
             scenario["generated_at"] = datetime.now(timezone.utc).isoformat()
             scenario["confidence"] = self.scorer.score(scenario, signals, graph)
+
+            # ── YENİ: Her senaryoya sinyal bazlı skorları ekle ───────────
+            scenario["impact_score"] = impact_result["impact_score"]
+            scenario["impact_label"] = impact_result["impact_label"]
+            scenario["uncertainty"] = uncertainty_result["uncertainty"]
+            scenario["uncertainty_label"] = uncertainty_result["uncertainty_label"]
+            scenario["dominant_signals"] = impact_result.get("dominant_signals", [])
+            scenario["missing_signal_categories"] = uncertainty_result.get("missing_categories", [])
+            scenario["conflicting_metrics"] = uncertainty_result.get("conflicting_metrics", [])
+            # ─────────────────────────────────────────────────────────────
+
             validation = self.validator.validate(scenario, graph, signals)
             if validation["valid"]:
                 validated.append(scenario)
@@ -87,7 +110,7 @@ class ScenarioGenerator:
                 logger.warning(f"Senaryo reddedildi [{scenario.get('name')}]: {validation['errors']}")
 
         # Katalog senaryolarını da ekle
-        catalog = self._load_catalog_scenarios(signals)
+        catalog = self._load_catalog_scenarios(signals, impact_result, uncertainty_result)
         validated.extend(catalog)
 
         validated.sort(key=lambda s: s.get("confidence", {}).get("confidence", 0), reverse=True)
@@ -113,7 +136,6 @@ class ScenarioGenerator:
         )[:8]
         nodes_str = ", ".join(n.get("label", n.get("id", "?")) for n in top_nodes)
 
-        # İhracat pazarlarını config'den dinamik çek
         markets_str = ""
         try:
             import yaml
@@ -133,7 +155,16 @@ class ScenarioGenerator:
             f"{markets_str}"
         )
 
-    def _load_catalog_scenarios(self, signals: list) -> list:
+    def _load_catalog_scenarios(
+        self,
+        signals: list,
+        impact_result: dict,
+        uncertainty_result: dict,
+    ) -> list:
+        """
+        Katalog senaryolarına da sinyal bazlı skorları ekle.
+        Mevcut trigger mantığı korundu.
+        """
         catalog = []
         if not CATALOG_DIR.exists():
             return catalog
@@ -148,6 +179,15 @@ class ScenarioGenerator:
                             "signal_strength": "catalog"
                         }
                         scenario["generated_at"] = datetime.now(timezone.utc).isoformat()
+
+                        # ── YENİ: Katalog senaryolarına da skor ekle ─────
+                        scenario["impact_score"] = impact_result["impact_score"]
+                        scenario["impact_label"] = impact_result["impact_label"]
+                        scenario["uncertainty"] = uncertainty_result["uncertainty"]
+                        scenario["uncertainty_label"] = uncertainty_result["uncertainty_label"]
+                        scenario["dominant_signals"] = impact_result.get("dominant_signals", [])
+                        # ─────────────────────────────────────────────────
+
                         catalog.append(scenario)
             except Exception as e:
                 logger.warning(f"Katalog yüklenemedi [{yaml_file}]: {e}")
