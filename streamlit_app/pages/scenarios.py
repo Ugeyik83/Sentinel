@@ -10,20 +10,13 @@ from pathlib import Path
 
 
 def render():
-    # Sayfa Başlığı ve Açıklaması
-    st.markdown("""
-        <div style='margin-bottom: 20px;'>
-            <h1 style='color: #1E3A8A; font-size: 32px; margin-bottom: 0;'>⚡ Senaryo & Simülasyon</h1>
-            <p style='color: #64748B; font-size: 15px;'>Risk senaryoları oluşturun, Sentinel AI ile simüle edin ve etki raporlarını alın.</p>
-        </div>
-    """, unsafe_allow_html=True)
+    st.title("⚡ Senaryo & Simülasyon")
 
     # Adım göstergesi
     step = _current_step()
     _render_stepper(step)
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.divider()
 
-    # İlgili adımı çalıştır
     if step == 1:
         _step1_scenario()
     elif step == 2:
@@ -45,42 +38,27 @@ def _current_step() -> int:
 
 
 def _render_stepper(step: int):
-    # CSS ile modern bir stepper görünümü (Streamlit container'larını kullanarak)
     col1, col2, col3 = st.columns(3)
-    
-    def get_style(is_active, is_completed):
-        if is_active:
-            return "background-color: #EFF6FF; border: 2px solid #3B82F6; color: #1E3A8A; font-weight: bold;"
-        elif is_completed:
-            return "background-color: #F8FAFC; border: 1px solid #E2E8F0; color: #94A3B8; text-decoration: line-through;"
-        else:
-            return "background-color: #FFFFFF; border: 1px dashed #CBD5E1; color: #64748B;"
-
-    with col1:
-        st.markdown(f"""
-        <div style='padding: 10px; border-radius: 8px; text-align: center; {get_style(step==1, step>1)}'>
-            📝 1. Senaryo Tanımı
-        </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"""
-        <div style='padding: 10px; border-radius: 8px; text-align: center; {get_style(step==2, step>2)}'>
-            ⚙️ 2. AI Simülasyonu
-        </div>
-        """, unsafe_allow_html=True)
-    with col3:
-        st.markdown(f"""
-        <div style='padding: 10px; border-radius: 8px; text-align: center; {get_style(step==3, False)}'>
-            📊 3. Analiz & Rapor
-        </div>
-        """, unsafe_allow_html=True)
+    steps = [
+        (1, "1. Senaryo"),
+        (2, "2. Simülasyon"),
+        (3, "3. Rapor"),
+    ]
+    cols = [col1, col2, col3]
+    for i, (num, label) in enumerate(steps):
+        with cols[i]:
+            if num < step:
+                st.markdown(f"✅ ~~{label}~~")
+            elif num == step:
+                st.markdown(f"**🔵 {label}**")
+            else:
+                st.markdown(f"⬜ {label}")
 
 
 # ── ADIM 1: Senaryo ───────────────────────────────────────────────────────────
 
 def _step1_scenario():
-    # Sekmeleri modernleştir
-    tab1, tab2 = st.tabs(["📚 Hazır Katalog", "🤖 AI Otomatik Üretim"])
+    tab1, tab2 = st.tabs(["Katalog", "Otomatik Üretim"])
     with tab1:
         _catalog()
     with tab2:
@@ -90,46 +68,35 @@ def _step1_scenario():
 def _catalog():
     import yaml
     found = False
-    
-    st.markdown("##### Katalogdan Senaryo Seçin")
-    st.caption("Önceden tanımlanmış risk şablonlarını kullanarak simülasyonu başlatabilirsiniz.")
-    
     for yaml_file in Path("scenarios/catalog").glob("*.yaml"):
-        try:
-            data = yaml.safe_load(yaml_file.read_text(encoding="utf-8"))
-            st.markdown(f"**{yaml_file.stem.replace('_', ' ').title()}**")
-            found = True
-            for scenario in data.get("scenarios", []):
-                # Expander yerine Container kullanarak daha şık bir "Kart" görünümü
-                with st.container(border=True):
-                    col_title, col_btn = st.columns([4, 1])
-                    with col_title:
-                        st.markdown(f"**📋 {scenario['name']}**")
-                        st.write(scenario.get("description", ""))
-                        st.caption(f"⚙️ **Mod:** `{scenario.get('simulation_mode', '?')}`  |  ⏳ **Ufuk:** `{scenario.get('time_horizon_days', '?')} gün`")
-                    with col_btn:
-                        st.markdown("<br>", unsafe_allow_html=True) # Hizalama
-                        if st.button("Seç & İlerle", key=f"cat_{scenario['id']}", type="primary", use_container_width=True):
-                            scenario["confidence"] = {}
-                            st.session_state["active_scenario"] = scenario
-                            st.session_state.pop("active_run_id", None)
-                            st.session_state.pop("report_ready", None)
-                            st.rerun()
-        except Exception:
-            pass # Hatalı YAML dosyalarını yoksay
-
+        data = yaml.safe_load(yaml_file.read_text(encoding="utf-8"))
+        st.subheader(yaml_file.stem.replace("_", " ").title())
+        found = True
+        for scenario in data.get("scenarios", []):
+            with st.expander(f"📋 {scenario['name']}"):
+                st.write(scenario.get("description", ""))
+                col1, col2 = st.columns(2)
+                col1.caption(f"**Mod:** {scenario.get('simulation_mode', '?')}")
+                col2.caption(f"**Ufuk:** {scenario.get('time_horizon_days', '?')} gün")
+                if st.button("▶️ Bu senaryoyla devam et",
+                             key=f"cat_{scenario['id']}", type="primary"):
+                    scenario["confidence"] = {}
+                    st.session_state["active_scenario"] = scenario
+                    st.session_state.pop("active_run_id", None)
+                    st.session_state.pop("report_ready", None)
+                    st.rerun()
     if not found:
-        st.warning("Katalog klasöründe (scenarios/catalog) okunabilir senaryo dosyası bulunamadı.")
+        st.warning("Katalog dosyası bulunamadı.")
 
 
 def _generator():
-    st.info("💡 **İpucu:** Sisteme topladığınız sinyalleri veya harici bir dosyayı vererek LLM'in sizin için özel bir risk senaryosu üretmesini sağlayabilirsiniz.")
+    st.info("Sinyalsiz de çalışır — LLM gereksinimi analiz eder.")
 
     # Haber seçici
     news_signals = _load_news_signals()
     if news_signals:
-        with st.expander(f"📰 Radardaki Haberleri Ekle ({len(news_signals)} haber)"):
-            st.caption("Seçtiğiniz haberler prompt (gereksinim) kutusuna otomatik eklenir.")
+        with st.expander(f"📰 Güncel Haberlerden Seç ({len(news_signals)} haber)"):
+            st.caption("Seçtiğin haberler gereksinim kutusuna eklenir.")
             selected_news = []
             label_colors = {"güncel": "🔵", "ekonomi-siyaset": "🟠", "iç siyaset": "🟣"}
             for i, news in enumerate(news_signals[:20]):
@@ -138,45 +105,39 @@ def _generator():
                 if st.checkbox(f"{icon} {title}", key=f"ns_{i}"):
                     selected_news.append(news)
             if selected_news:
-                if st.button("➕ Seçilenleri Prompt'a Ekle", type="secondary"):
+                if st.button("➕ Gereksinime Ekle", type="secondary"):
                     news_text = _build_news_context(selected_news)
                     existing = st.session_state.get("last_requirement", "")
                     st.session_state["last_requirement"] = (existing + "\n" + news_text).strip()
                     st.rerun()
 
-    # Prompt Alanı (Ana girdi)
     requirement = st.text_area(
-        "Senaryo Promptu (Gereksinim)",
-        height=150,
-        placeholder="Örnek: Lityum batarya (GTİP 8507) ihracatındaki A.TR belgesi süreçlerinde yaşanacak 1 haftalık bir gecikme, üretim ve lojistik senkronizasyonumuzu nasıl etkiler?",
+        "Simülasyon gereksinimi",
+        height=130,
+        placeholder="Örnek: Türkiye'deki kur krizi IGYA'yı 90 günde nasıl etkiler?",
         value=st.session_state.get("last_requirement", ""),
     )
 
-    # Ek Kaynaklar ve Ayarlar
-    col_upload, col_settings = st.columns([1, 1])
-    
-    with col_upload:
-        with st.container(border=True):
-            st.markdown("**📎 Harici Kaynak Bağla**")
-            uploaded_file = st.file_uploader("Dosya (PDF, DOCX vb.)", type=["pdf", "docx", "txt", "md", "xlsx"], label_visibility="collapsed")
-            url_input = st.text_input("URL Veri Kaynağı", placeholder="https://...")
+    with st.expander("📎 Ek Kaynak (opsiyonel)"):
+        col_f, col_u = st.columns(2)
+        with col_f:
+            uploaded_file = st.file_uploader("Dosya", type=["pdf", "docx", "txt", "md", "xlsx"])
+        with col_u:
+            url_input = st.text_input("URL", placeholder="https://...")
 
-    with col_settings:
-        with st.container(border=True):
-            st.markdown("**⚙️ Üretim Ayarları**")
-            count = st.slider("Üretilecek Varyasyon Sayısı", 1, 5, 3)
-            time_horizon = st.slider("Simülasyon Ufku (Gün)", 7, 180, 90)
+    col1, col2 = st.columns(2)
+    count = col1.slider("Senaryo sayısı", 1, 5, 3)
+    time_horizon = col2.slider("Zaman ufku (gün)", 7, 180, 90)
 
-    # Üret Butonu
-    if st.button("✨ Yapay Zeka İle Senaryo Üret", type="primary", use_container_width=True, disabled=not requirement.strip()):
+    if st.button("🔄 Senaryo Üret", type="primary", disabled=not requirement.strip()):
         st.session_state["last_requirement"] = requirement
 
         extra_context = ""
         if uploaded_file:
-            with st.spinner(f"📄 Dosya analiz ediliyor..."):
+            with st.spinner(f"📄 Okunuyor..."):
                 extra_context += _extract_file(uploaded_file)
         if url_input and url_input.strip().startswith("http"):
-            with st.spinner("🌐 Web sayfası ayrıştırılıyor..."):
+            with st.spinner("🌐 URL çekiliyor..."):
                 extra_context += _extract_url(url_input.strip())
 
         full_req = requirement
@@ -187,7 +148,7 @@ def _generator():
         graph = _build_graph()
 
         from scenarios.generator import ScenarioGenerator
-        with st.spinner("LLM senaryo varyasyonlarını kurguluyor..."):
+        with st.spinner("Senaryo üretiliyor..."):
             try:
                 gen = ScenarioGenerator()
                 scenarios = gen.generate(signals=signals, graph=graph,
@@ -197,29 +158,29 @@ def _generator():
                     s.pop("confidence", None)
                 st.session_state["generated_scenarios"] = scenarios
             except Exception as e:
-                st.error(f"Hata oluştu: {e}")
+                st.error(f"Hata: {e}")
                 return
 
-    # Üretilen senaryoları göster
+    # Üretilen senaryolar
     scenarios = st.session_state.get("generated_scenarios", [])
     if scenarios:
-        st.success(f"✅ Başarıyla {len(scenarios)} adet senaryo varyasyonu üretildi.")
+        st.divider()
+        st.subheader(f"✅ {len(scenarios)} Senaryo")
         for i, s in enumerate(scenarios):
-            with st.container(border=True):
-                col_info, col_btn2 = st.columns([4, 1])
-                with col_info:
-                    st.markdown(f"**⚡ {s.get('name', f'Varyasyon {i+1}')}**")
-                    st.write(s.get("description", ""))
-                    roles = s.get("affected_roles", [])
-                    if roles:
-                        st.caption(f"👥 **Etkilenen Roller:** {', '.join(roles)}")
-                with col_btn2:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("Seç & İlerle", key=f"gen_{s.get('id', i)}", type="primary", use_container_width=True):
-                        st.session_state["active_scenario"] = s
-                        st.session_state.pop("active_run_id", None)
-                        st.session_state.pop("report_ready", None)
-                        st.rerun()
+            with st.expander(f"📋 {s.get('name', f'Senaryo {i+1}')}", expanded=(i == 0)):
+                st.write(s.get("description", ""))
+                col1, col2 = st.columns(2)
+                col1.caption(f"**Mod:** {s.get('simulation_mode', '?')}")
+                col2.caption(f"**Ufuk:** {s.get('time_horizon_days', '?')} gün")
+                roles = s.get("affected_roles", [])
+                if roles:
+                    st.caption(f"**Roller:** {', '.join(roles)}")
+                if st.button("▶️ Bu senaryoyla devam et",
+                             key=f"gen_{s.get('id', i)}", type="primary"):
+                    st.session_state["active_scenario"] = s
+                    st.session_state.pop("active_run_id", None)
+                    st.session_state.pop("report_ready", None)
+                    st.rerun()
 
 
 # ── ADIM 2: Simülasyon ────────────────────────────────────────────────────────
@@ -227,58 +188,46 @@ def _generator():
 def _step2_simulation():
     scenario = st.session_state["active_scenario"]
 
-    st.markdown("#### Simülasyon Parametreleri")
-    
     with st.container(border=True):
-        st.markdown(f"**Seçili Senaryo:** {scenario['name']}")
-        st.info(scenario.get("description", "")[:300] + "...")
+        st.markdown(f"**Senaryo:** {scenario['name']}")
+        st.caption(scenario.get("description", "")[:200])
 
-    col1, col2 = st.columns(2)
-    with col1:
-        mode = st.selectbox("Çalışma Modu", 
-                          options=["hierarchical", "consensus"],
-                          format_func=lambda x: "Hiyerarşik (Ajanlar Amirlerine Raporlar)" if x == "hierarchical" else "Uzlaşma (Konsensüs Arayışı)",
+    col1, col2, col3 = st.columns([2, 2, 1])
+    mode = col1.selectbox("Mod", ["hierarchical", "consensus"],
                           index=0 if scenario.get("simulation_mode") == "hierarchical" else 1)
-    with col2:
-        horizon = st.slider("Simülasyon Etki Ufku (Gün)", 7, 180, scenario.get("time_horizon_days", 90))
+    horizon = col2.slider("Ufuk (gün)", 7, 180, scenario.get("time_horizon_days", 90))
 
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    col_back, col_run = st.columns([1, 4])
-    with col_back:
-        if st.button("← Senaryo Seçimine Dön", use_container_width=True):
+    with col3:
+        st.write("")
+        st.write("")
+        if st.button("← Geri", type="secondary"):
             st.session_state.pop("active_scenario", None)
             st.rerun()
-            
-    with col_run:
-        if st.button("🚀 Sentinel Simülasyonunu Başlat", type="primary", use_container_width=True):
-            scenario["simulation_mode"] = mode
-            scenario["time_horizon_days"] = horizon
 
-            from app.run_artifacts import RunStore
-            store = RunStore()
-            run_id = str(uuid.uuid4())[:8]
-            run_dir = store.create_run(run_id)
-            store.update_manifest(run_id, status="RUNNING", scenario=scenario)
+    st.divider()
 
-            # Daha şık bir spinner
-            with st.status("Simülasyon Çalıştırılıyor...", expanded=True) as status:
-                st.write("Ajanlar (Crew) uyandırılıyor...")
-                try:
-                    from crew.runner import SimulationRunner
-                    runner = SimulationRunner(str(run_dir))
-                    
-                    st.write("Risk modeli işletiliyor...")
-                    result = runner.run(scenario)
-                    
-                    store.update_manifest(run_id, status="COMPLETED")
-                    st.session_state["active_run_id"] = run_id
-                    st.session_state["simulation_result"] = result
-                    status.update(label="Simülasyon Tamamlandı!", state="complete", expanded=False)
-                    st.rerun()
-                except Exception as e:
-                    store.update_manifest(run_id, status="FAILED", error=str(e))
-                    status.update(label=f"Simülasyon Başarısız: {e}", state="error")
+    if st.button("▶️ Simülasyonu Başlat", type="primary", use_container_width=True):
+        scenario["simulation_mode"] = mode
+        scenario["time_horizon_days"] = horizon
+
+        from app.run_artifacts import RunStore
+        store = RunStore()
+        run_id = str(uuid.uuid4())[:8]
+        run_dir = store.create_run(run_id)
+        store.update_manifest(run_id, status="RUNNING", scenario=scenario)
+
+        with st.spinner("Simülasyon çalışıyor... (1-2 dakika)"):
+            try:
+                from crew.runner import SimulationRunner
+                runner = SimulationRunner(str(run_dir))
+                result = runner.run(scenario)
+                store.update_manifest(run_id, status="COMPLETED")
+                st.session_state["active_run_id"] = run_id
+                st.session_state["simulation_result"] = result
+                st.rerun()
+            except Exception as e:
+                store.update_manifest(run_id, status="FAILED", error=str(e))
+                st.error(f"Hata: {e}")
 
 
 # ── ADIM 3: Rapor ─────────────────────────────────────────────────────────────
@@ -295,12 +244,10 @@ def _step3_report():
     report_path = run_dir / "report" / "report.md"
     verdict_path = run_dir / "report" / "verdict.json"
 
-    # Üst Kontroller
-    col_title, col_back = st.columns([4, 1])
-    with col_title:
-        st.markdown("#### Analiz ve Aksiyon Raporu")
+    # Geri butonu
+    col_title, col_back = st.columns([5, 1])
     with col_back:
-        if st.button("➕ Yeni Senaryo", type="secondary", use_container_width=True):
+        if st.button("← Yeni Senaryo", type="secondary"):
             st.session_state.pop("active_scenario", None)
             st.session_state.pop("active_run_id", None)
             st.session_state.pop("simulation_result", None)
@@ -309,9 +256,9 @@ def _step3_report():
             st.rerun()
 
     if not report_path.exists():
-        st.warning("Veriler simüle edildi. Nihai raporu oluşturmak için aşağıdaki butona tıklayın.")
-        if st.button("📝 Yönetici Raporunu (Executive Summary) Oluştur", type="primary", use_container_width=True):
-            with st.spinner("AI Rapor Ajanı verileri derliyor..."):
+        st.info("Simülasyon tamamlandı. Raporu oluşturmak için butona basın.")
+        if st.button("📝 Raporu Oluştur", type="primary", use_container_width=True):
+            with st.spinner("Rapor oluşturuluyor..."):
                 try:
                     from crew.action_engine import ActionRecommendationEngine
                     from report.report_agent import ReportAgent
@@ -328,59 +275,100 @@ def _step3_report():
                     st.session_state["report_ready"] = True
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Rapor üretim hatası: {e}")
+                    st.error(f"Hata: {e}")
         return
 
-    # Rapor Hazırsa Gösterilecek Kısım
-    st.success("Rapor başarıyla oluşturuldu.", icon="✅")
-
-    # Verdict (Karar) Özeti Metrikleri
+    # Verdict özet
     if verdict_path.exists():
         try:
             verdict = json.loads(verdict_path.read_text())
-            col_v1, col_v2, col_v3 = st.columns(3)
-            with col_v1:
-                with st.container(border=True):
-                    st.metric("Olası Sonuç (Tahmin)", verdict.get("predicted_outcome", "—")[:40] + "...")
-            with col_v2:
-                with st.container(border=True):
-                    st.metric("Risk Süresi", f"{verdict.get('time_horizon', '—')} Gün")
-            with col_v3:
-                with st.container(border=True):
-                    st.metric("Run ID", f"#{run_id.upper()}")
+            col1, col2 = st.columns(2)
+            col1.metric("Tahmin", verdict.get("predicted_outcome", "—")[:50])
+            col2.metric("Zaman Ufku", verdict.get("time_horizon", "—"))
         except Exception:
             pass
 
-    # Rapor İçeriği Görüntüleme Alanı
+    st.divider()
+
+    # Debate sonucu varsa göster
+    result = st.session_state.get("simulation_result", {})
+    debate = result.get("debate", {})
+    if debate:
+        _render_debate_result(debate)
+        st.divider()
+
+    # Rapor içeriği
     report_text = report_path.read_text(encoding="utf-8")
-    
-    with st.container(border=True):
-        st.markdown(report_text)
+    st.markdown(report_text)
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.divider()
 
-    # İndirme Seçenekleri (Modern butonlar)
-    col_d1, col_d2, col_empty = st.columns([1, 1, 2])
-    with col_d1:
-        st.download_button("📥 Markdown (MD) Olarak İndir", report_text, f"sentinel_rapor_{run_id}.md", "text/markdown", use_container_width=True)
+    # İndirme
+    col1, col2 = st.columns(2)
+    col1.download_button("📥 MD İndir", report_text,
+                         f"sentinel_{run_id}.md", "text/markdown")
 
-    with col_d2:
-        if st.button("📄 PDF Oluştur & İndir", use_container_width=True):
-            try:
-                from report.pdf_exporter import export_pdf
-                pdf_path = str(run_dir / "report" / "report.pdf")
-                export_pdf(report_text, pdf_path)
-                with open(pdf_path, "rb") as f:
-                    st.download_button("📥 PDF İndir", f.read(), f"sentinel_rapor_{run_id}.pdf", "application/pdf", key="dl_pdf")
-            except Exception as e:
-                st.error(f"PDF dönüştürme hatası: Sisteme 'Weasyprint' veya 'pdfkit' gibi bir paket kurulu olmayabilir. Detay: {e}")
+    if col2.button("📄 PDF Oluştur"):
+        try:
+            from report.pdf_exporter import export_pdf
+            pdf_path = str(run_dir / "report" / "report.pdf")
+            export_pdf(report_text, pdf_path)
+            with open(pdf_path, "rb") as f:
+                col2.download_button("📥 PDF İndir", f.read(),
+                                     f"sentinel_{run_id}.pdf", "application/pdf")
+        except Exception as e:
+            st.error(f"PDF hatası: {e}")
 
 
-# ── Yardımcılar (Değiştirilmedi) ───────────────────────────────────────────────────────────────
+# ── Yardımcılar ───────────────────────────────────────────────────────────────
+
+
+
+def _render_debate_result(debate: dict):
+    """Debate sonucunu Streamlit'te göster."""
+    if not debate:
+        return
+
+    st.subheader("🗣️ Debate Özeti")
+    summary = debate.get("debate_summary", {})
+
+    # Judge kararı — en önemli
+    judge = summary.get("judge_decision", "")
+    if judge:
+        with st.container(border=True):
+            st.markdown("**⚖️ Judge Kararı**")
+            st.write(judge)
+
+    col1, col2 = st.columns(2)
+
+    devil = summary.get("devil_advocate_final", "")
+    if devil:
+        with col1:
+            with st.container(border=True):
+                st.markdown("**😈 Devil's Advocate**")
+                st.caption(devil[:400])
+
+    red = summary.get("red_team_failures", "")
+    if red:
+        with col2:
+            with st.container(border=True):
+                st.markdown("**🔴 Red Team — Başarısızlık Modları**")
+                st.caption(red[:400])
+
+    trace = debate.get("trace", [])
+    if trace:
+        with st.expander(f"📋 Audit Trail ({len(trace)} kayıt)", expanded=False):
+            for entry in trace:
+                st.markdown(
+                    f"**Tur {entry.get('round','?')} — {entry.get('agent','?')}**"
+                )
+                st.caption(entry.get("content", "")[:250])
+                st.divider()
 
 def _load_signals() -> list:
     p = Path("uploads/runs/latest_signals.json")
     return json.loads(p.read_text()) if p.exists() else []
+
 
 def _load_news_signals() -> list:
     signals = _load_signals()
@@ -388,14 +376,16 @@ def _load_news_signals() -> list:
     news.sort(key=lambda x: x.get("published_at", x.get("collected_at", "")), reverse=True)
     return news
 
+
 def _build_news_context(selected: list) -> str:
-    lines = ["Aşağıdaki güncel haberler dikkate alınarak etki analiz edilsin:\n"]
+    lines = ["Aşağıdaki güncel haberler dikkate alınarak IGYA'ya etkisi analiz edilsin:\n"]
     for n in selected:
         pub = n.get("published_at", "")[:10]
         lines.append(f"• [{pub}] {n.get('title', '')}")
         if n.get("summary"):
             lines.append(f"  {n['summary']}")
     return "\n".join(lines)
+
 
 def _extract_file(uploaded_file) -> str:
     try:
@@ -411,6 +401,7 @@ def _extract_file(uploaded_file) -> str:
     except Exception as e:
         return f"\n[Dosya okunamadı: {e}]\n"
 
+
 def _extract_url(url: str) -> str:
     try:
         import requests
@@ -424,6 +415,7 @@ def _extract_url(url: str) -> str:
         return f"\n[URL: {url}]\n" + "\n".join(lines[:200]) + "\n"
     except Exception as e:
         return f"\n[URL okunamadı: {e}]\n"
+
 
 def _build_graph() -> dict:
     org_path = Path("config/org_chart.json")
