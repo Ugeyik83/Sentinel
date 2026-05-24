@@ -94,29 +94,45 @@ def _get_client(provider: str):
 # ── CrewAI için LangChain LLM ─────────────────────────────────────────────────
 
 def get_llm():
-    """CrewAI ajanları için LLM — string format (CrewAI uyumlu)."""
+    """CrewAI ajanları için LLM nesnesi — CrewAI.LLM sınıfı kullanır."""
+    from crewai import LLM
+
     provider = get_provider()
     model = _default_model(provider)
+    temp = float(os.environ.get("LLM_TEMPERATURE", "0.7"))
 
-    # CrewAI string format: "provider/model"
     if provider == "openai":
-        return model  # CrewAI OpenAI'yi default kullanır
+        return LLM(
+            model=model,
+            api_key=os.environ.get("OPENAI_API_KEY", ""),
+            temperature=temp,
+        )
 
     elif provider == "groq":
-        # CrewAI LiteLLM üzerinden Groq destekler
-        os.environ["GROQ_API_KEY"] = os.environ.get("GROQ_API_KEY", "")
-        return f"groq/{model}"
+        return LLM(
+            model=f"groq/{model}",
+            api_key=os.environ.get("GROQ_API_KEY", ""),
+            temperature=temp,
+        )
 
     elif provider == "gemini":
-        key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY", "")
-        os.environ["GEMINI_API_KEY"] = key
-        return f"gemini/{model}"
+        return LLM(
+            model=f"gemini/{model}",
+            api_key=(
+                os.environ.get("GEMINI_API_KEY") or
+                os.environ.get("GOOGLE_API_KEY", "")
+            ),
+            temperature=temp,
+        )
 
     elif provider == "mistral":
-        os.environ["MISTRAL_API_KEY"] = os.environ.get("MISTRAL_API_KEY", "")
-        return f"mistral/{model}"
+        return LLM(
+            model=f"mistral/{model}",
+            api_key=os.environ.get("MISTRAL_API_KEY", ""),
+            temperature=temp,
+        )
 
-    return model
+    return LLM(model=model, temperature=temp)
 
 
 # ── chat() — tüm senkron LLM çağrıları ───────────────────────────────────────
