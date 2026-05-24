@@ -1,150 +1,149 @@
 """
 streamlit_app/pages/settings.py
-Zamanlama, bildirim, eşik ve ihracat pazarı konfigürasyonu.
 """
 
 import streamlit as st
-import yaml
-import json
-from pathlib import Path
+import os
+
+
+PROVIDERS = {
+    "openai":  {"name": "OpenAI",         "key_env": "OPENAI_API_KEY",  "model_env": "LLM_MODEL_NAME",  "default_model": "gpt-4o",                    "free": False},
+    "groq":    {"name": "Groq (Ücretsiz)","key_env": "GROQ_API_KEY",    "model_env": "LLM_MODEL_NAME",  "default_model": "llama-3.1-70b-versatile",    "free": True},
+    "gemini":  {"name": "Google Gemini",  "key_env": "GEMINI_API_KEY",  "model_env": "LLM_MODEL_NAME",  "default_model": "gemini-1.5-flash",           "free": True},
+    "mistral": {"name": "Mistral AI",     "key_env": "MISTRAL_API_KEY", "model_env": "LLM_MODEL_NAME",  "default_model": "mistral-large-latest",       "free": True},
+}
+
+GROQ_MODELS    = ["llama-3.1-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"]
+OPENAI_MODELS  = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"]
+GEMINI_MODELS  = ["gemini-1.5-flash", "gemini-1.5-pro"]
+MISTRAL_MODELS = ["mistral-large-latest", "mistral-small-latest", "open-mistral-7b"]
 
 
 def render():
     st.title("⚙️ Ayarlar")
 
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "İhracat Pazarları", "Sinyal Eşikleri",
-        "Bildirimler", "Manuel Tetikle"
-    ])
+    # ── LLM Provider ──────────────────────────────────────────────────────────
+    st.subheader("🤖 LLM Provider")
 
-    with tab1:
-        _render_markets()
+    current_provider = os.environ.get("LLM_PROVIDER", _detect_active())
 
-    with tab2:
-        _render_thresholds()
+    provider_options = list(PROVIDERS.keys())
+    provider_labels  = [
+        f"{v['name']} {'✅ Ücretsiz' if v['free'] else '💳 Ücretli'}"
+        for v in PROVIDERS.values()
+    ]
 
-    with tab3:
-        _render_notifications()
-
-    with tab4:
-        _render_manual_trigger()
-
-
-def _render_markets():
-    st.subheader("İhracat Pazarları")
-    path = Path("config/export_markets.yaml")
-    config = yaml.safe_load(path.read_text()) if path.exists() else {"markets": []}
-
-    st.dataframe(
-        [{"Ülke": m["country"], "Kod": m["code"],
-          "Para Birimi": m["currency"],
-          "Sertifikalar": ", ".join(m.get("certifications", [])),
-          "Öncelik": m.get("priority", "medium")}
-         for m in config.get("markets", [])],
-        use_container_width=True, hide_index=True
+    selected_idx = provider_options.index(current_provider) if current_provider in provider_options else 0
+    selected_label = st.radio(
+        "Provider seç",
+        provider_labels,
+        index=selected_idx,
+        horizontal=True,
     )
+    selected_provider = provider_options[provider_labels.index(selected_label)]
+    cfg = PROVIDERS[selected_provider]
 
     st.divider()
-    st.subheader("Yeni Pazar Ekle")
+
+    # ── API Key ───────────────────────────────────────────────────────────────
+    st.subheader(f"🔑 {cfg['name']} API Key")
+
+    current_key = os.environ.get(cfg["key_env"], "")
+    masked = f"{'*' * (len(current_key) - 4)}{current_key[-4:]}" if len(current_key) > 4 else ""
+
+    if current_key:
+        st.success(f"✅ API key mevcut: `{masked}`")
+    else:
+        st.warning("⚠️ API key tanımlı değil.")
+
+    with st.expander("API Key değiştir"):
+        new_key = st.text_input("Yeni API Key", type="password", placeholder="sk-...")
+        if st.button("💾 Kaydet", type="primary") and new_key:
+            os.environ[cfg["key_env"]] = new_key
+            os.environ["LLM_PROVIDER"] = selected_provider
+            st.success("✅ Kaydedildi. Sayfa yenilenene kadar geçerli.")
+            st.caption("⚠️ Kalıcı için Streamlit Cloud → Secrets → ekle.")
+
+    st.divider()
+
+    # ── Model Seçimi ──────────────────────────────────────────────────────────
+    st.subheader("🧠 Model")
+
+    model_list = {
+        "openai":  OPENAI_MODELS,
+        "groq":    GROQ_MODELS,
+        "gemini":  GEMINI_MODELS,
+        "mistral": MISTRAL_MODELS,
+    }.get(selected_provider, [])
+
+    current_model = os.environ.get("LLM_MODEL_NAME", cfg["default_model"])
+    if current_model not in model_list:
+        model_list = [current_model] + model_list
+
+    selected_model = st.selectbox("Model", model_list,
+                                  index=model_list.index(current_model))
+
+    if st.button("Model Güncelle"):
+        os.environ["LLM_MODEL_NAME"] = selected_model
+        os.environ["LLM_PROVIDER"]   = selected_provider
+        st.success(f"✅ Model: `{selected_model}` | Provider: `{selected_provider}`")
+
+    st.divider()
+
+    # ── Aktif Durum ───────────────────────────────────────────────────────────
+    st.subheader("📊 Aktif Konfigürasyon")
+
+    active = _detect_active()
     col1, col2, col3 = st.columns(3)
-    country = col1.text_input("Ülke")
-    code = col2.text_input("ISO Kodu (2 harf)")
-    currency = col3.text_input("Para Birimi")
-    certs = st.text_input("Sertifikalar (virgülle)", placeholder="SASO, CE")
-    priority = st.selectbox("Öncelik", ["high", "medium", "low"])
+    col1.metric("Provider", PROVIDERS.get(active, {}).get("name", active))
+    col2.metric("Model", os.environ.get("LLM_MODEL_NAME", "—"))
+    col3.metric("Ücretsiz mi?", "✅ Evet" if PROVIDERS.get(active, {}).get("free") else "💳 Hayır")
 
-    if st.button("➕ Ekle", disabled=not (country and code and currency)):
-        config["markets"].append({
-            "country": country,
-            "code": code.upper(),
-            "currency": currency.upper(),
-            "certifications": [c.strip() for c in certs.split(",") if c.strip()],
-            "priority": priority,
-        })
-        path.write_text(yaml.dump(config, allow_unicode=True, default_flow_style=False))
-        st.success(f"✅ {country} eklendi.")
-        st.rerun()
+    st.divider()
 
+    # ── Hızlı Başlangıç ───────────────────────────────────────────────────────
+    with st.expander("📖 Ücretsiz Provider Kurulum Rehberi"):
+        st.markdown("""
+**Groq (Önerilen — En Hızlı)**
+1. https://console.groq.com → Ücretsiz hesap aç
+2. API Keys → Create API Key
+3. Yukarıdan Groq seç → Key gir → Kaydet
+4. Streamlit Cloud → Settings → Secrets:
+```
+GROQ_API_KEY = "gsk_..."
+LLM_PROVIDER = "groq"
+```
 
-def _render_thresholds():
-    st.subheader("Sinyal Eşik Değerleri")
-    path = Path("config/thresholds.yaml")
-    config = yaml.safe_load(path.read_text()) if path.exists() else {}
+**Google Gemini**
+1. https://aistudio.google.com → Get API Key
+2. Yukarıdan Gemini seç → Key gir
+3. Secrets:
+```
+GEMINI_API_KEY = "AIza..."
+LLM_PROVIDER = "gemini"
+```
 
-    changed = False
-    new_config = {}
-    for category, metrics in config.items():
-        st.markdown(f"**{category.upper()}**")
-        new_config[category] = {}
-        for metric, value in metrics.items():
-            new_val = st.number_input(
-                f"{metric}", value=float(value), step=0.5,
-                key=f"thresh_{category}_{metric}"
-            )
-            new_config[category][metric] = new_val
-            if new_val != value:
-                changed = True
-
-    if changed and st.button("💾 Eşikleri Kaydet"):
-        path.write_text(yaml.dump(new_config, allow_unicode=True, default_flow_style=False))
-        st.success("✅ Eşikler güncellendi.")
+**Mistral AI**
+1. https://console.mistral.ai → Free tier
+2. API Keys → Create
+3. Secrets:
+```
+MISTRAL_API_KEY = "..."
+LLM_PROVIDER = "mistral"
+```
+        """)
 
 
-def _render_notifications():
-    st.subheader("Bildirim Kanalları")
-    path = Path("config/notifications.yaml")
-    config = yaml.safe_load(path.read_text()) if path.exists() else {}
-
-    channels = config.get("channels", {})
-
-    for channel, cfg in channels.items():
-        with st.expander(f"{'✅' if cfg.get('enabled') else '⭕'} {channel.upper()}"):
-            enabled = st.checkbox("Aktif", value=cfg.get("enabled", False), key=f"en_{channel}")
-            channels[channel]["enabled"] = enabled
-            if channel == "slack":
-                url = st.text_input("Webhook URL", value=cfg.get("webhook_url", ""),
-                                    type="password", key=f"wh_{channel}")
-                channels[channel]["webhook_url"] = url
-            elif channel == "email":
-                recipients = st.text_input(
-                    "Alıcılar (virgülle)",
-                    value=", ".join(cfg.get("recipients", [])),
-                    key=f"rc_{channel}"
-                )
-                channels[channel]["recipients"] = [r.strip() for r in recipients.split(",")]
-
-    if st.button("💾 Bildirimleri Kaydet"):
-        config["channels"] = channels
-        path.write_text(yaml.dump(config, allow_unicode=True, default_flow_style=False))
-        st.success("✅ Bildirim ayarları güncellendi.")
-
-
-def _render_manual_trigger():
-    st.subheader("Manuel Görev Tetikle")
-    st.caption("Scheduler'ı beklemeden anında çalıştır.")
-
-    col1, col2 = st.columns(2)
-
-    if col1.button("📡 Sinyalleri Topla"):
-        from scheduler.runner import _collect_signals
-        with st.spinner("Sinyaller toplanıyor..."):
-            _collect_signals()
-        st.success("✅ Sinyaller toplandı.")
-
-    if col2.button("⚠️ Eşik Kontrolü"):
-        from scheduler.runner import _check_thresholds
-        with st.spinner("Eşikler kontrol ediliyor..."):
-            _check_thresholds()
-        st.success("✅ Eşik kontrolü tamamlandı.")
-
-    if col1.button("🔍 Zayıf Sinyal Tara"):
-        from scheduler.runner import _weak_signal_check
-        with st.spinner("Zayıf sinyaller taranıyor..."):
-            _weak_signal_check()
-        st.success("✅ Tarama tamamlandı.")
-
-    if col2.button("📊 Haftalık Özet"):
-        from scheduler.runner import _weekly_summary
-        with st.spinner("Özet oluşturuluyor..."):
-            _weekly_summary()
-        st.success("✅ Haftalık özet oluşturuldu.")
+def _detect_active() -> str:
+    explicit = os.environ.get("LLM_PROVIDER", "").lower()
+    if explicit in PROVIDERS:
+        return explicit
+    if os.environ.get("OPENAI_API_KEY"):
+        return "openai"
+    if os.environ.get("GROQ_API_KEY"):
+        return "groq"
+    if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
+        return "gemini"
+    if os.environ.get("MISTRAL_API_KEY"):
+        return "mistral"
+    return "openai"

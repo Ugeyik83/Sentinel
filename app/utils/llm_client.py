@@ -1,5 +1,11 @@
 """
-app/utils/llm_client.py — OpenAI API wrapper. Tüm LLM çağrıları buradan.
+app/utils/llm_client.py
+Multi-provider LLM wrapper.
+
+Provider seçimi (öncelik sırası):
+1. LLM_PROVIDER env değişkeni: "openai" | "groq" | "gemini" | "mistral"
+2. Yoksa: mevcut API key'e göre otomatik seç
+3. Hiçbiri yoksa: hata mesajı
 """
 
 import os
@@ -7,56 +13,227 @@ import json
 import time
 import logging
 from typing import Optional
-from openai import OpenAI
 
 logger = logging.getLogger(__name__)
-_client: Optional[OpenAI] = None
 
 
-def get_client() -> OpenAI:
-    global _client
-    if _client is None:
-        _client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
-    return _client
+# ── Provider tespiti ──────────────────────────────────────────────────────────
+
+def _detect_provider() -> str:
+    """Hangi provider kullanılacak — env'den veya mevcut key'den."""
+    explicit = os.environ.get("LLM_PROVIDER", "").lower()
+    if explicit in ("openai", "groq", "gemini", "mistral"):
+        return explicit
+
+    # Otomatik tespit — hangi key varsa onu kullan
+    if os.environ.get("OPENAI_API_KEY"):
+        return "openai"
+    if os.environ.get("GROQ_API_KEY"):
+        return "groq"
+    if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
+        return "gemini"
+    if os.environ.get("MISTRAL_API_KEY"):
+        return "mistral"
+
+    return "openai"  # fallback
 
 
-def get_llm() -> str:
-    """
-    CrewAI için LLM model adını string olarak döndür.
-    CrewAI 0.63+ string model adı kabul eder.
-    """
-    return os.environ.get("LLM_MODEL_NAME", "gpt-4o")
+def get_provider() -> str:
+    return _detect_provider()
 
+
+# ── Default model per provider ────────────────────────────────────────────────
+
+DEFAULT_MODELS = {
+    "openai":  "gpt-4o",
+    "groq":    "llama-3.1-70b-versatile",
+    "gemini":  "gemini-1.5-flash",
+    "mistral": "mistral-large-latest",
+}
+
+def _default_model(provider: str) -> str:
+    env_model = os.environ.get("LLM_MODEL_NAME", "")
+    return env_model or DEFAULT_MODELS.get(provider, "gpt-4o")
+
+
+# ── Client factory ────────────────────────────────────────────────────────────
+
+_clients: dict = {}
+
+def _get_client(provider: str):
+    global _clients
+    if provider in _clients:
+        return _clients[provider]
+
+    if provider == "openai":
+        from openai import OpenAI
+        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+
+    elif provider == "groq":
+        from groq import Groq
+        client = Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
+
+    elif provider == "gemini":
+        import google.generativeai as genai
+        genai.configure(
+            api_key=os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY", "")
+        )
+        client = genai  # Gemini farklı API — özel handler
+
+    elif provider == "mistral":
+        from mistralai import Mistral
+        client = Mistral(api_key=os.environ.get("MISTRAL_API_KEY", ""))
+
+    else:
+        raise ValueError(f"Bilinmeyen provider: {provider}")
+
+    _clients[provider] = client
+    return client
+
+
+# ── CrewAI için LangChain LLM ─────────────────────────────────────────────────
+
+def get_llm():
+    """CrewAI ajanları için LangChain uyumlu LLM nesnesi."""
+    provider = get_provider()
+    model = _default_model(provider)
+    temp = float(os.environ.get("LLM_TEMPERATURE", "0.7"))
+
+    if provider == "openai":
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(
+            model=model,
+            api_key=os.environ.get("OPENAI_API_KEY", ""),
+            temperature=temp,
+        )
+
+    elif provider == "groq":
+        from langchain_groq import ChatGroq
+        return ChatGroq(
+            model=model,
+            api_key=os.environ.get("GROQ_API_KEY", ""),
+            temperature=temp,
+        )
+
+    elif provider == "gemini":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(
+            model=model,
+            google_api_key=(
+                os.environ.get("GEMINI_API_KEY") or
+                os.environ.get("GOOGLE_API_KEY", "")
+            ),
+            temperature=temp,
+        )
+
+    elif provider == "mistral":
+        from langchain_mistralai import ChatMistralAI
+        return ChatMistralAI(
+            model=model,
+            api_key=os.environ.get("MISTRAL_API_KEY", ""),
+            temperature=temp,
+        )
+
+    raise ValueError(f"Desteklenmeyen provider: {provider}")
+
+
+# ── chat() — tüm senkron LLM çağrıları ───────────────────────────────────────
 
 def chat(messages: list, model: str = None, temperature: float = 0.7,
          max_tokens: int = 4096, max_retries: int = 3) -> str:
-    model = model or os.environ.get("LLM_MODEL_NAME", "gpt-4o")
-    client = get_client()
+
+    provider = get_provider()
+    model = model or _default_model(provider)
+
     for attempt in range(1, max_retries + 1):
         try:
-            response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            return response.choices[0].message.content
+            if provider == "gemini":
+                return _chat_gemini(messages, model, temperature, max_tokens)
+
+            client = _get_client(provider)
+
+            if provider in ("openai", "groq"):
+                resp = client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                return resp.choices[0].message.content
+
+            elif provider == "mistral":
+                resp = client.chat.complete(
+                    model=model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                return resp.choices[0].message.content
+
         except Exception as e:
-            logger.warning(f"LLM hata (deneme {attempt}/{max_retries}): {e}")
+            logger.warning(f"LLM hata [{provider}] (deneme {attempt}/{max_retries}): {e}")
             if attempt == max_retries:
                 raise
             time.sleep(2 ** attempt)
 
 
-def chat_json(messages: list, model: str = None, temperature: float = 0.3,
-              max_tokens: int = 4096) -> dict:
-    model = model or os.environ.get("LLM_MODEL_NAME", "gpt-4o")
-    client = get_client()
-    response = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        response_format={"type": "json_object"},
+def _chat_gemini(messages: list, model: str,
+                 temperature: float, max_tokens: int) -> str:
+    """Gemini API farklı format kullanır."""
+    import google.generativeai as genai
+
+    gmodel = genai.GenerativeModel(
+        model_name=model,
+        generation_config={
+            "temperature": temperature,
+            "max_output_tokens": max_tokens,
+        }
     )
-    return json.loads(response.choices[0].message.content)
+    # OpenAI formatını Gemini formatına çevir
+    prompt = "\n\n".join([
+        f"[{m['role'].upper()}]\n{m['content']}"
+        for m in messages
+    ])
+    response = gmodel.generate_content(prompt)
+    return response.text
+
+
+# ── chat_json() — JSON çıktı garantili ───────────────────────────────────────
+
+def chat_json(messages: list, model: str = None,
+              temperature: float = 0.3, max_tokens: int = 4096) -> dict:
+
+    provider = get_provider()
+    model = model or _default_model(provider)
+
+    # JSON mode — sadece OpenAI ve Groq destekliyor
+    if provider in ("openai", "groq"):
+        client = _get_client(provider)
+        resp = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            response_format={"type": "json_object"},
+        )
+        raw = resp.choices[0].message.content
+
+    else:
+        # Gemini ve Mistral — JSON talebi prompt'a ekle
+        json_messages = messages.copy()
+        json_messages[-1]["content"] += (
+            "\n\nÖNEMLİ: Sadece geçerli JSON döndür. "
+            "Başında veya sonunda markdown, açıklama veya ``` olmamalı."
+        )
+        raw = chat(json_messages, model=model,
+                   temperature=temperature, max_tokens=max_tokens)
+
+    # Temizle ve parse et
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+    raw = raw.strip()
+
+    return json.loads(raw)
