@@ -46,11 +46,10 @@ def get_provider() -> str:
 
 DEFAULT_MODELS = {
     "openai":  "gpt-4o",
-    "groq":    "llama-3.3-70b-versatile",
+    "groq":    "llama-3.3-70b-versatile",  # ✅ 3.1 yerine 3.3
     "gemini":  "gemini-1.5-flash",
     "mistral": "mistral-large-latest",
 }
-
 
 def _default_model(provider: str) -> str:
     env_model = os.environ.get("LLM_MODEL_NAME", "")
@@ -60,7 +59,6 @@ def _default_model(provider: str) -> str:
 # ── Client factory (SDK) ──────────────────────────────────────────────────────
 
 _clients: dict = {}
-
 
 def _get_client(provider: str):
     global _clients
@@ -93,18 +91,14 @@ def _get_client(provider: str):
     return client
 
 
-# ── CrewAI için LLM (CrewAI 1.14.5 uyumlu) ────────────────────────────────────
-# NOT: CrewAI 1.14.5'te Agent(llm=...) artık LangChain Chat* nesnelerini
-# (ChatGroq/ChatOpenAI vb.) kabul etmeyebilir. Bu nedenle CrewAI'ye string model
-# kimliği dönüyoruz. CrewAI bu string'i provider/model formatıyla yönlendirebilir. [1](https://deepwiki.com/crewAIInc/crewAI/4-llm-integration)[2](https://pypi.org/project/crewai/)
+# ── CrewAI için LLM (string) ─────────────────────────────────────────────────
+# Groq/LiteLLM tarafında model prefix formatı: "groq/<model>". [3](https://learnpythoneasily.com/groq-api-with-langchain/)
 
 def get_llm():
     """CrewAI ajanları için LLM tanımı (string model id döndürür)."""
     provider = get_provider()
     model = _default_model(provider)
 
-    # LiteLLM/provider routing için yaygın format: "<provider>/<model>"
-    # openai için prefix zorunlu değil; istersen "openai/gpt-4o" da verebilirsin.
     if provider in ("groq", "gemini", "mistral"):
         return f"{provider}/{model}"
 
@@ -163,7 +157,6 @@ def _chat_gemini(messages: list, model: str,
             "max_output_tokens": max_tokens,
         }
     )
-    # OpenAI formatını Gemini formatına çevir
     prompt = "\n\n".join([
         f"[{m['role'].upper()}]\n{m['content']}"
         for m in messages
@@ -172,15 +165,12 @@ def _chat_gemini(messages: list, model: str,
     return response.text
 
 
-# ── chat_json() — JSON çıktı garantili ───────────────────────────────────────
-
 def chat_json(messages: list, model: str = None,
               temperature: float = 0.3, max_tokens: int = 4096) -> dict:
 
     provider = get_provider()
     model = model or _default_model(provider)
 
-    # JSON mode — sadece OpenAI ve Groq destekliyor
     if provider in ("openai", "groq"):
         client = _get_client(provider)
         resp = client.chat.completions.create(
@@ -193,7 +183,6 @@ def chat_json(messages: list, model: str = None,
         raw = resp.choices[0].message.content
 
     else:
-        # Gemini ve Mistral — JSON talebi prompt'a ekle
         json_messages = messages.copy()
         json_messages[-1]["content"] += (
             "\n\nÖNEMLİ: Sadece geçerli JSON döndür. "
@@ -202,7 +191,6 @@ def chat_json(messages: list, model: str = None,
         raw = chat(json_messages, model=model,
                    temperature=temperature, max_tokens=max_tokens)
 
-    # Temizle ve parse et
     raw = raw.strip()
     if raw.startswith("```"):
         raw = raw.split("```")[1]
