@@ -2,25 +2,18 @@
 streamlit>=1.35.0
 
 # ── LLM / AI — Core ──────────────────────────────────────────────────────────
-crewai==0.63.0
+crewai>=0.80.0
+crewai-tools>=0.14.0
 
-# ── LLM Providers (en az biri gerekli) ───────────────────────────────────────
-# OpenAI
+# ── LLM Providers ────────────────────────────────────────────────────────────
 openai>=1.30.0
-langchain-openai>=0.1.0
-
-# Groq (ücretsiz — önerilen)
 groq>=0.9.0
 langchain-groq>=0.1.0
-litellm>=1.40.0
-
-# Google Gemini (ücretsiz)
 google-generativeai>=0.7.0
 langchain-google-genai>=1.0.0
-
-# Mistral (ücretsiz tier)
 mistralai>=1.0.0
 langchain-mistralai>=0.1.0
+litellm>=1.40.0
 
 # ── Sinyal Toplama ────────────────────────────────────────────────────────────
 requests>=2.31.0
