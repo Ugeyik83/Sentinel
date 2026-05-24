@@ -94,47 +94,29 @@ def _get_client(provider: str):
 # ── CrewAI için LangChain LLM ─────────────────────────────────────────────────
 
 def get_llm():
-    """CrewAI ajanları için LangChain uyumlu LLM nesnesi."""
+    """CrewAI ajanları için LLM — string format (CrewAI uyumlu)."""
     provider = get_provider()
     model = _default_model(provider)
-    temp = float(os.environ.get("LLM_TEMPERATURE", "0.7"))
 
+    # CrewAI string format: "provider/model"
     if provider == "openai":
-        from langchain_openai import ChatOpenAI
-        return ChatOpenAI(
-            model=model,
-            api_key=os.environ.get("OPENAI_API_KEY", ""),
-            temperature=temp,
-        )
+        return model  # CrewAI OpenAI'yi default kullanır
 
     elif provider == "groq":
-        from langchain_groq import ChatGroq
-        return ChatGroq(
-            model=model,
-            api_key=os.environ.get("GROQ_API_KEY", ""),
-            temperature=temp,
-        )
+        # CrewAI LiteLLM üzerinden Groq destekler
+        os.environ["GROQ_API_KEY"] = os.environ.get("GROQ_API_KEY", "")
+        return f"groq/{model}"
 
     elif provider == "gemini":
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        return ChatGoogleGenerativeAI(
-            model=model,
-            google_api_key=(
-                os.environ.get("GEMINI_API_KEY") or
-                os.environ.get("GOOGLE_API_KEY", "")
-            ),
-            temperature=temp,
-        )
+        key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY", "")
+        os.environ["GEMINI_API_KEY"] = key
+        return f"gemini/{model}"
 
     elif provider == "mistral":
-        from langchain_mistralai import ChatMistralAI
-        return ChatMistralAI(
-            model=model,
-            api_key=os.environ.get("MISTRAL_API_KEY", ""),
-            temperature=temp,
-        )
+        os.environ["MISTRAL_API_KEY"] = os.environ.get("MISTRAL_API_KEY", "")
+        return f"mistral/{model}"
 
-    raise ValueError(f"Desteklenmeyen provider: {provider}")
+    return model
 
 
 # ── chat() — tüm senkron LLM çağrıları ───────────────────────────────────────
