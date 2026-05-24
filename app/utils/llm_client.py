@@ -5,7 +5,7 @@ Multi-provider LLM wrapper.
 Provider seçimi (öncelik sırası):
 1. LLM_PROVIDER env değişkeni: "openai" | "groq" | "gemini" | "mistral"
 2. Yoksa: mevcut API key'e göre otomatik seç
-3. Hiçbiri yoksa: hata mesajı
+3. Hiçbiri yoksa: fallback
 """
 
 import os
@@ -46,19 +46,21 @@ def get_provider() -> str:
 
 DEFAULT_MODELS = {
     "openai":  "gpt-4o",
-    "groq":    "llama-3.1-70b-versatile",
+    "groq":    "llama-3.3-70b-versatile",
     "gemini":  "gemini-1.5-flash",
     "mistral": "mistral-large-latest",
 }
+
 
 def _default_model(provider: str) -> str:
     env_model = os.environ.get("LLM_MODEL_NAME", "")
     return env_model or DEFAULT_MODELS.get(provider, "gpt-4o")
 
 
-# ── Client factory ────────────────────────────────────────────────────────────
+# ── Client factory (SDK) ──────────────────────────────────────────────────────
 
 _clients: dict = {}
+
 
 def _get_client(provider: str):
     global _clients
@@ -91,52 +93,25 @@ def _get_client(provider: str):
     return client
 
 
-# ── CrewAI için LangChain LLM ─────────────────────────────────────────────────
+# ── CrewAI için LLM (CrewAI 1.14.5 uyumlu) ────────────────────────────────────
+# NOT: CrewAI 1.14.5'te Agent(llm=...) artık LangChain Chat* nesnelerini
+# (ChatGroq/ChatOpenAI vb.) kabul etmeyebilir. Bu nedenle CrewAI'ye string model
+# kimliği dönüyoruz. CrewAI bu string'i provider/model formatıyla yönlendirebilir. [1](https://deepwiki.com/crewAIInc/crewAI/4-llm-integration)[2](https://pypi.org/project/crewai/)
 
 def get_llm():
-    """CrewAI ajanları için LLM nesnesi."""
+    """CrewAI ajanları için LLM tanımı (string model id döndürür)."""
     provider = get_provider()
     model = _default_model(provider)
-    temp = float(os.environ.get("LLM_TEMPERATURE", "0.7"))
 
-    if provider == "groq":
-        # Groq cache_breakpoint desteklemiyor — LangChain wrapper kullan
-        from langchain_groq import ChatGroq
-        return ChatGroq(
-            model=model,
-            groq_api_key=os.environ.get("GROQ_API_KEY", ""),
-            temperature=temp,
-        )
+    # LiteLLM/provider routing için yaygın format: "<provider>/<model>"
+    # openai için prefix zorunlu değil; istersen "openai/gpt-4o" da verebilirsin.
+    if provider in ("groq", "gemini", "mistral"):
+        return f"{provider}/{model}"
 
-    elif provider == "gemini":
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        return ChatGoogleGenerativeAI(
-            model=model,
-            google_api_key=(
-                os.environ.get("GEMINI_API_KEY") or
-                os.environ.get("GOOGLE_API_KEY", "")
-            ),
-            temperature=temp,
-        )
-
-    elif provider == "mistral":
-        from langchain_mistralai import ChatMistralAI
-        return ChatMistralAI(
-            model=model,
-            api_key=os.environ.get("MISTRAL_API_KEY", ""),
-            temperature=temp,
-        )
-
-    else:  # openai default
-        from langchain_openai import ChatOpenAI
-        return ChatOpenAI(
-            model=model,
-            api_key=os.environ.get("OPENAI_API_KEY", ""),
-            temperature=temp,
-        )
+    return model
 
 
-# ── chat() — tüm senkron LLM çağrıları ───────────────────────────────────────
+# ── chat() — tüm senkron LLM çağrıları (SDK) ──────────────────────────────────
 
 def chat(messages: list, model: str = None, temperature: float = 0.7,
          max_tokens: int = 4096, max_retries: int = 3) -> str:
