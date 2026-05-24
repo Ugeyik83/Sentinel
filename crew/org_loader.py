@@ -27,8 +27,14 @@ class OrgLoader:
         self.job_descriptions = job_descriptions or {}
         self.decision_history = decision_history or {}
         self.agents = {}        # id → Agent
-        self.llm = get_llm()
+        self._llm = None        # lazy init
         self.persona_builder = PersonaBuilder()
+
+    @property
+    def llm(self):
+        if self._llm is None:
+            self._llm = get_llm()
+        return self._llm
 
     def _load(self, path: str) -> dict:
         return json.loads(Path(path).read_text(encoding="utf-8"))

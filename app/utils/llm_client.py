@@ -94,31 +94,25 @@ def _get_client(provider: str):
 # ── CrewAI için LangChain LLM ─────────────────────────────────────────────────
 
 def get_llm():
-    """CrewAI ajanları için LLM nesnesi — CrewAI.LLM sınıfı kullanır."""
-    from crewai import LLM
-
+    """CrewAI ajanları için LLM nesnesi."""
     provider = get_provider()
     model = _default_model(provider)
     temp = float(os.environ.get("LLM_TEMPERATURE", "0.7"))
 
-    if provider == "openai":
-        return LLM(
+    if provider == "groq":
+        # Groq cache_breakpoint desteklemiyor — LangChain wrapper kullan
+        from langchain_groq import ChatGroq
+        return ChatGroq(
             model=model,
-            api_key=os.environ.get("OPENAI_API_KEY", ""),
-            temperature=temp,
-        )
-
-    elif provider == "groq":
-        return LLM(
-            model=f"groq/{model}",
-            api_key=os.environ.get("GROQ_API_KEY", ""),
+            groq_api_key=os.environ.get("GROQ_API_KEY", ""),
             temperature=temp,
         )
 
     elif provider == "gemini":
-        return LLM(
-            model=f"gemini/{model}",
-            api_key=(
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(
+            model=model,
+            google_api_key=(
                 os.environ.get("GEMINI_API_KEY") or
                 os.environ.get("GOOGLE_API_KEY", "")
             ),
@@ -126,13 +120,20 @@ def get_llm():
         )
 
     elif provider == "mistral":
-        return LLM(
-            model=f"mistral/{model}",
+        from langchain_mistralai import ChatMistralAI
+        return ChatMistralAI(
+            model=model,
             api_key=os.environ.get("MISTRAL_API_KEY", ""),
             temperature=temp,
         )
 
-    return LLM(model=model, temperature=temp)
+    else:  # openai default
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(
+            model=model,
+            api_key=os.environ.get("OPENAI_API_KEY", ""),
+            temperature=temp,
+        )
 
 
 # ── chat() — tüm senkron LLM çağrıları ───────────────────────────────────────
